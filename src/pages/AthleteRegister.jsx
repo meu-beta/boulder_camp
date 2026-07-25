@@ -13,7 +13,7 @@ export default function AthleteRegister() {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/athlete-control/login');
+    navigate('/comp/athlete-control/login');
   };
 
   const handleSubmit = async (e) => {
@@ -45,8 +45,8 @@ export default function AthleteRegister() {
             <h1 className="text-2xl font-bold">Cadastro de atletas</h1>
           </div>
           <div className="flex gap-4 items-center text-sm">
-            <Link to="/athlete-control/queue" className="text-white/70 hover:text-white">Fila</Link>
-            <Link to="/athlete-control/timer" className="text-white/70 hover:text-white">Cronômetro</Link>
+            <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">Fila</Link>
+            <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">Cronômetro</Link>
             <button onClick={handleLogout} className="text-white/50 hover:text-white">Sair</button>
           </div>
         </div>
