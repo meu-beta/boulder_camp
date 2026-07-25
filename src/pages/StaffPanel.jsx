@@ -67,7 +67,7 @@ export default function StaffPanel() {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/staff/login');
+    navigate('/comp/staff/login');
   };
 
   return (
@@ -79,7 +79,7 @@ export default function StaffPanel() {
             <h1 className="text-2xl font-bold">Painel de pontuação</h1>
           </div>
           <div className="flex gap-4 items-center text-sm">
-            <Link to="/staff/ranking" className="text-white/70 hover:text-white">Ver ranking</Link>
+            <Link to="/comp/staff/ranking" className="text-white/70 hover:text-white">Ver ranking</Link>
             <button onClick={handleLogout} className="text-white/50 hover:text-white">Sair</button>
           </div>
         </div>
