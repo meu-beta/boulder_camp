@@ -96,7 +96,7 @@ export default function AthleteQueue() {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/athlete-control/login');
+    navigate('/comp/athlete-control/login');
   };
 
   const persistOrder = async (list) => {
@@ -151,8 +151,8 @@ export default function AthleteQueue() {
             </p>
           </div>
           <div className="flex gap-4 items-center text-sm">
-            <Link to="/athlete-control/register" className="text-white/70 hover:text-white">Cadastro</Link>
-            <Link to="/athlete-control/timer" className="text-white/70 hover:text-white">Cronômetro</Link>
+            <Link to="/comp/athlete-control/register" className="text-white/70 hover:text-white">Cadastro</Link>
+            <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">Cronômetro</Link>
             <button onClick={handleLogout} className="text-white/50 hover:text-white">Sair</button>
           </div>
         </div>
