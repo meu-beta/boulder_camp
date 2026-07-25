@@ -12,7 +12,7 @@ export default function StaffRanking() {
           <p className="text-gold uppercase tracking-widest text-xs">Staff — Arbitragem</p>
           <h1 className="text-2xl font-bold">Ranking</h1>
         </div>
-        <Link to="/staff/panel" className="text-white/70 hover:text-white text-sm">
+        <Link to="/comp/staff/panel" className="text-white/70 hover:text-white text-sm">
           Voltar ao painel
         </Link>
       </div>
