@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './auth/ProtectedRoute';
 
+import Home from './pages/Home';
 import PublicRanking from './pages/PublicRanking';
 import PublicInsights from './pages/PublicInsights';
 
@@ -15,24 +16,30 @@ import AthleteTimer from './pages/AthleteTimer';
 export default function App() {
   return (
     <Routes>
-      {/* PÚBLICO — sem login */}
-      <Route path="/" element={<PublicRanking />} />
-      <Route path="/insights" element={<PublicInsights />} />
+      {/* HOME — convite para conhecer o app Meu Beta */}
+      <Route path="/" element={<Home />} />
+
+      {/* MEU BETA COMP — PÚBLICO — sem login */}
+      <Route path="/comp" element={<PublicRanking />} />
+      <Route path="/comp/insights" element={<PublicInsights />} />
 
       {/* STAFF — arbitragem (pontuação) */}
-      <Route path="/staff/login" element={<StaffLogin role="staff" />} />
       <Route
-        path="/staff/panel"
+        path="/comp/staff/login"
+        element={<StaffLogin role="staff" redirectTo="/comp/staff/panel" />}
+      />
+      <Route
+        path="/comp/staff/panel"
         element={
-          <ProtectedRoute role="staff" redirectTo="/staff/login">
+          <ProtectedRoute role="staff" redirectTo="/comp/staff/login">
             <StaffPanel />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/staff/ranking"
+        path="/comp/staff/ranking"
         element={
-          <ProtectedRoute role="staff" redirectTo="/staff/login">
+          <ProtectedRoute role="staff" redirectTo="/comp/staff/login">
             <StaffRanking />
           </ProtectedRoute>
         }
@@ -40,35 +47,35 @@ export default function App() {
 
       {/* CONTROLE DE ATLETAS — cadastro, fila, cronômetro */}
       <Route
-        path="/athlete-control/login"
+        path="/comp/athlete-control/login"
         element={
           <StaffLogin
             role="athlete_control"
             title="CONTROLE — Atletas"
-            redirectTo="/athlete-control/queue"
+            redirectTo="/comp/athlete-control/queue"
           />
         }
       />
       <Route
-        path="/athlete-control/register"
+        path="/comp/athlete-control/register"
         element={
-          <ProtectedRoute role="athlete_control" redirectTo="/athlete-control/login">
+          <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
             <AthleteRegister />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/athlete-control/queue"
+        path="/comp/athlete-control/queue"
         element={
-          <ProtectedRoute role="athlete_control" redirectTo="/athlete-control/login">
+          <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
             <AthleteQueue />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/athlete-control/timer"
+        path="/comp/athlete-control/timer"
         element={
-          <ProtectedRoute role="athlete_control" redirectTo="/athlete-control/login">
+          <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
             <AthleteTimer />
           </ProtectedRoute>
         }
