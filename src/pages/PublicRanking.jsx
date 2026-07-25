@@ -13,10 +13,11 @@ export default function PublicRanking() {
           <h1 className="text-2xl font-bold">Ranking ao vivo</h1>
         </div>
         <nav className="flex gap-4 text-sm text-white/70">
-          <Link to="/" className="hover:text-white">Ranking</Link>
-          <Link to="/insights" className="hover:text-white">Insights</Link>
-          <Link to="/staff/login" className="hover:text-white">Staff</Link>
-          <Link to="/athlete-control/login" className="hover:text-white">Controle</Link>
+          <Link to="/comp" className="hover:text-white">Ranking</Link>
+          <Link to="/comp/insights" className="hover:text-white">Insights</Link>
+          <Link to="/comp/staff/login" className="hover:text-white">Staff</Link>
+          <Link to="/comp/athlete-control/login" className="hover:text-white">Controle</Link>
+          <Link to="/" className="hover:text-white text-white/40">Meu Beta</Link>
         </nav>
       </div>
       {loading ? (
