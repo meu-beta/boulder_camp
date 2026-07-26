@@ -12,6 +12,7 @@ import StaffRanking from './pages/StaffRanking';
 import AthleteRegister from './pages/AthleteRegister';
 import AthleteQueue from './pages/AthleteQueue';
 import AthleteTimer from './pages/AthleteTimer';
+import RoundsAdmin from './pages/RoundsAdmin';
 
 export default function App() {
   return (
@@ -45,7 +46,7 @@ export default function App() {
         }
       />
 
-      {/* CONTROLE DE ATLETAS — cadastro, fila, cronômetro */}
+      {/* CONTROLE DE ATLETAS — cadastro, fases, fila, cronômetro */}
       <Route
         path="/comp/athlete-control/login"
         element={
@@ -61,6 +62,14 @@ export default function App() {
         element={
           <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
             <AthleteRegister />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/comp/athlete-control/rounds"
+        element={
+          <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
+            <RoundsAdmin />
           </ProtectedRoute>
         }
       />

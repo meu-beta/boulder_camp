@@ -15,6 +15,17 @@ body {
 .square-zone {
   background: linear-gradient(to top, #f2c14e 50%, transparent 50%);
 }
+.square-tried {
+  @apply bg-white/10 border-white/20;
+}
 .square-empty {
-  @apply bg-transparent;
+  @apply bg-transparent border-white/15;
+}
+
+/* Dígitos do cronômetro de projeção: largura fixa para não "dançar". */
+.timer-digits {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+  line-height: 0.9;
 }
