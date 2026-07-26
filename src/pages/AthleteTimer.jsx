@@ -1,68 +1,242 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
-import { useLiveEvent } from '../lib/useLiveEvent';
-import Timer from '../components/Timer';
+import { beepCountdown, beepEnd, beepOneMinute, unlockAudio } from '../lib/beep';
+
+// Cronômetro único, pensado para ser projetado.
+// O estado fica no Supabase (tabela timer_state, linha id = 1), então
+// qualquer tela aberta mostra exatamente o mesmo tempo.
+//
+// Bips: dois em 1 minuto restante, um a cada segundo nos 5 finais,
+// e um longo no zero.
+
+const PRESETS = [4, 5, 6];
+
+function formatClock(totalSeconds) {
+  const safe = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 export default function AthleteTimer() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const { queue } = useLiveEvent('Boulder');
-  const [timers, setTimers] = useState({ 1: null, 2: null });
 
+  const [state, setState] = useState(null);
+  const [remaining, setRemaining] = useState(0);
+  const [customMinutes, setCustomMinutes] = useState('');
+  const lastBeepedSecond = useRef(null);
+
+  // ---- carrega e escuta o estado compartilhado ----
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('timer_state').select('*');
-      const map = {};
-      (data ?? []).forEach((t) => (map[t.lane] = t));
-      setTimers(map);
+      const { data } = await supabase.from('timer_state').select('*').eq('id', 1).single();
+      if (data) setState(data);
     };
     load();
 
     const channel = supabase
-      .channel('timer-state')
+      .channel('timer-projection')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'timer_state' }, load)
       .subscribe();
-    return () => supabase.removeChannel(channel);
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const onWall = queue.filter((q) => q.status === 'on_wall');
+  // ---- tique local, 10x por segundo para não perder o segundo cheio ----
+  useEffect(() => {
+    if (!state) return undefined;
+
+    const tick = () => {
+      if (state.running && state.ends_at) {
+        const diff = (new Date(state.ends_at).getTime() - Date.now()) / 1000;
+        setRemaining(Math.max(0, Math.ceil(diff)));
+      } else {
+        setRemaining(state.remaining_seconds ?? 0);
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [state]);
+
+  // ---- bips ----
+  useEffect(() => {
+    if (!state?.running) {
+      lastBeepedSecond.current = null;
+      return;
+    }
+    if (lastBeepedSecond.current === remaining) return;
+    lastBeepedSecond.current = remaining;
+
+    if (remaining === 60) beepOneMinute();
+    else if (remaining <= 5 && remaining >= 1) beepCountdown();
+    else if (remaining === 0) beepEnd();
+  }, [remaining, state?.running]);
+
+  // ---- ações ----
+  const patch = async (changes) => {
+    unlockAudio();
+    await supabase
+      .from('timer_state')
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq('id', 1);
+  };
+
+  const handleStart = () => {
+    const seconds = remaining > 0 ? remaining : state?.duration_seconds ?? 240;
+    patch({
+      running: true,
+      ends_at: new Date(Date.now() + seconds * 1000).toISOString(),
+      remaining_seconds: seconds,
+    });
+  };
+
+  const handlePause = () => patch({ running: false, remaining_seconds: remaining, ends_at: null });
+
+  const handleReset = () =>
+    patch({
+      running: false,
+      ends_at: null,
+      remaining_seconds: state?.duration_seconds ?? 240,
+    });
+
+  const handleSetMinutes = (minutes) => {
+    const seconds = Math.round(minutes * 60);
+    patch({
+      running: false,
+      ends_at: null,
+      duration_seconds: seconds,
+      remaining_seconds: seconds,
+    });
+    setCustomMinutes('');
+  };
 
   const handleLogout = async () => {
     await signOut();
     navigate('/comp/athlete-control/login');
   };
 
+  const running = Boolean(state?.running);
+  const finished = remaining === 0;
+  const critical = remaining <= 5 && remaining > 0;
+  const warning = remaining <= 60 && remaining > 5;
+
+  const digitColor = finished
+    ? 'text-red-500'
+    : critical
+    ? 'text-red-400'
+    : warning
+    ? 'text-gold'
+    : 'text-white';
+
   return (
-    <div className="min-h-screen bg-panel px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <p className="text-gold uppercase tracking-widest text-xs">Controle de Atletas</p>
-            <h1 className="text-2xl font-bold">Cronômetro</h1>
-          </div>
-          <div className="flex gap-4 items-center text-sm">
-            <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">Fila</Link>
-            <Link to="/comp/athlete-control/register" className="text-white/70 hover:text-white">Cadastro</Link>
-            <button onClick={handleLogout} className="text-white/50 hover:text-white">Sair</button>
-          </div>
+    <div className="min-h-screen bg-panel flex flex-col">
+      {/* Cabeçalho discreto — some da vista no projetor */}
+      <div className="flex items-center justify-between px-6 py-3 text-sm text-white/40">
+        <span className="uppercase tracking-widest text-xs">Cronômetro</span>
+        <div className="flex gap-4 items-center">
+          <Link to="/comp/athlete-control/queue" className="hover:text-white">
+            Fila
+          </Link>
+          <Link to="/comp/athlete-control/register" className="hover:text-white">
+            Cadastro
+          </Link>
+          <Link to="/comp/athlete-control/rounds" className="hover:text-white">
+            Fases
+          </Link>
+          <button onClick={handleLogout} className="hover:text-white">
+            Sair
+          </button>
+        </div>
+      </div>
+
+      {/* O relógio, ocupando tudo */}
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div
+          className={`timer-digits font-extrabold tabular-nums transition-colors ${digitColor} ${
+            critical ? 'animate-pulse' : ''
+          }`}
+          style={{ fontSize: 'min(38vw, 60vh)' }}
+        >
+          {formatClock(remaining)}
+        </div>
+      </div>
+
+      {/* Controles */}
+      <div className="px-6 pb-10 flex flex-col items-center gap-5">
+        <div className="flex flex-wrap gap-3 justify-center">
+          {running ? (
+            <button
+              onClick={handlePause}
+              className="px-10 py-4 rounded-xl bg-white/10 text-white font-bold text-xl hover:bg-white/20"
+            >
+              Pausar
+            </button>
+          ) : (
+            <button
+              onClick={handleStart}
+              disabled={remaining === 0}
+              className="px-10 py-4 rounded-xl bg-gold text-panel font-bold text-xl hover:opacity-90 disabled:opacity-30"
+            >
+              Iniciar
+            </button>
+          )}
+          <button
+            onClick={handleReset}
+            className="px-10 py-4 rounded-xl border border-white/20 text-white font-bold text-xl hover:bg-white/10"
+          >
+            Zerar
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <Timer
-            lane={1}
-            athleteName={onWall[0]?.athlete?.name}
-            state={timers[1]}
-            onChange={(s) => setTimers((t) => ({ ...t, 1: s }))}
+        <div className="flex flex-wrap items-center gap-2 justify-center">
+          <span className="text-white/40 text-sm mr-1">Definir tempo:</span>
+          {PRESETS.map((minutes) => (
+            <button
+              key={minutes}
+              onClick={() => handleSetMinutes(minutes)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${
+                state?.duration_seconds === minutes * 60
+                  ? 'bg-gold text-panel border-gold'
+                  : 'border-white/20 text-white/70 hover:text-white hover:border-white/40'
+              }`}
+            >
+              {minutes} min
+            </button>
+          ))}
+          <input
+            type="number"
+            min={1}
+            max={60}
+            placeholder="outro"
+            value={customMinutes}
+            onChange={(e) => setCustomMinutes(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && Number(customMinutes) > 0) {
+                handleSetMinutes(Number(customMinutes));
+              }
+            }}
+            className="w-24 px-3 py-2 rounded-lg bg-panel2 border border-white/20 text-white text-sm focus:border-gold outline-none"
           />
-          <Timer
-            lane={2}
-            athleteName={onWall[1]?.athlete?.name}
-            state={timers[2]}
-            onChange={(s) => setTimers((t) => ({ ...t, 2: s }))}
-          />
+          <button
+            onClick={() => Number(customMinutes) > 0 && handleSetMinutes(Number(customMinutes))}
+            disabled={!(Number(customMinutes) > 0)}
+            className="px-4 py-2 rounded-lg bg-white/10 text-white text-sm font-semibold disabled:opacity-30"
+          >
+            Aplicar
+          </button>
         </div>
+
+        <p className="text-white/25 text-xs text-center max-w-md">
+          Bip duplo ao faltar 1 minuto, bip a cada um dos 5 segundos finais e bip longo no zero.
+          Clique em qualquer botão uma vez para o navegador liberar o som.
+        </p>
       </div>
     </div>
   );
