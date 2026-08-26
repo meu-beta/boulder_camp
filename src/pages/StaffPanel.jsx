@@ -3,16 +3,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
-import { boulderScore, formatScore } from '../lib/scoring';
+import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
+import { EVENT_TITLE } from '../lib/event';
 import PhaseTabs from '../components/PhaseTabs';
 
-// Painel do árbitro. Escolhe-se o atleta uma vez e todos os boulders da
-// fase abrem juntos, para preencher a rodada inteira sem trocar de tela.
-// Cada boulder tem um cadeado: depois de confirmado, trava contra
-// edição acidental.
+// Painel do árbitro, organizado POR BOULDER: escolhe-se o boulder e a tela
+// lista todos os atletas da fase para lançamento. É o formato que combina
+// com um juiz fixo em cada boulder.
+//
+// Só se digita Zona e Top (com o número da tentativa em que cada um foi
+// conquistado). O total de tentativas é calculado — é a tentativa da
+// última conquista — e aparece apenas como leitura.
 
 const EMPTY_ROW = {
-  attempts: 0,
+  attempted: false,
   zone: false,
   zone_attempts: 0,
   top: false,
@@ -34,20 +38,34 @@ function LockIcon({ locked }) {
   );
 }
 
-function BoulderCard({ boulder, draft, onChange, dirty }) {
+function AthleteRow({ athlete, draft, dirty, onChange }) {
   const locked = draft.locked;
   const value = boulderScore(draft);
+  const attempts = attemptsOf(draft);
+  const touched = participated(draft);
 
   const update = (changes) => onChange({ ...draft, ...changes });
 
+  const setZone = (checked) => {
+    if (checked) {
+      update({
+        attempted: true,
+        zone: true,
+        zone_attempts: draft.zone_attempts || 1,
+      });
+    } else {
+      // sem zona não há top
+      update({ zone: false, zone_attempts: 0, top: false, top_attempts: 0 });
+    }
+  };
+
   const setTop = (checked) => {
     if (checked) {
-      const attempt = draft.top_attempts || draft.attempts || 1;
+      const attempt = draft.top_attempts || draft.zone_attempts || 1;
       update({
+        attempted: true,
         top: true,
         top_attempts: attempt,
-        attempts: Math.max(draft.attempts, attempt),
-        // não se faz o top sem passar pela zona
         zone: true,
         zone_attempts: draft.zone_attempts || attempt,
       });
@@ -56,22 +74,9 @@ function BoulderCard({ boulder, draft, onChange, dirty }) {
     }
   };
 
-  const setZone = (checked) => {
-    if (checked) {
-      const attempt = draft.zone_attempts || draft.attempts || 1;
-      update({
-        zone: true,
-        zone_attempts: attempt,
-        attempts: Math.max(draft.attempts, attempt),
-      });
-    } else {
-      update({ zone: false, zone_attempts: 0, top: false, top_attempts: 0 });
-    }
-  };
-
   return (
     <div
-      className={`rounded-xl border p-4 transition ${
+      className={`rounded-xl border px-4 py-3 transition ${
         locked
           ? 'bg-panel2/40 border-white/5'
           : dirty
@@ -79,18 +84,25 @@ function BoulderCard({ boulder, draft, onChange, dirty }) {
           : 'bg-panel2 border-white/10'
       }`}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className={`font-bold ${locked ? 'text-white/40' : 'text-white'}`}>
-          Boulder {boulder.number}
-        </h3>
-        <div className="flex items-center gap-3">
-          <span
-            className={`text-lg font-extrabold tabular-nums ${
-              value > 0 ? 'text-gold' : 'text-white/30'
-            }`}
-          >
-            {formatScore(value)}
-          </span>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <span className={`font-semibold truncate ${locked ? 'text-white/40' : 'text-white'}`}>
+          {athlete.bib_number ? (
+            <span className="text-white/40 mr-1">#{athlete.bib_number}</span>
+          ) : null}
+          {athlete.name}
+        </span>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            <span
+              className={`text-lg font-extrabold tabular-nums ${
+                value > 0 ? 'text-gold' : 'text-white/25'
+              }`}
+            >
+              {formatScore(value)}
+            </span>
+            <span className="text-white/30 text-[11px] ml-2 tabular-nums">{attempts} tent.</span>
+          </div>
           <button
             onClick={() => update({ locked: !locked })}
             title={locked ? 'Destravar para editar' : 'Travar contra edição acidental'}
@@ -106,57 +118,55 @@ function BoulderCard({ boulder, draft, onChange, dirty }) {
       </div>
 
       <fieldset disabled={locked} className={locked ? 'opacity-50' : ''}>
-        <label className="block text-xs text-white/60 mb-1">Total de tentativas</label>
-        <input
-          type="number"
-          min={0}
-          value={draft.attempts}
-          onChange={(e) => update({ attempts: Math.max(0, Number(e.target.value) || 0) })}
-          className="w-full mb-3 px-3 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none"
-        />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="flex items-center gap-2 text-sm mb-1">
-              <input type="checkbox" checked={draft.zone} onChange={(e) => setZone(e.target.checked)} />
-              <span className="font-semibold">Zona</span>
-            </label>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={draft.zone}
+              onChange={(e) => setZone(e.target.checked)}
+            />
+            <span className="font-semibold">Zona</span>
+            <span className="text-white/40 text-xs">na tentativa</span>
             <input
               type="number"
               min={1}
               disabled={!draft.zone}
-              placeholder="tent."
               value={draft.zone_attempts || ''}
-              onChange={(e) =>
-                update({
-                  zone_attempts: Math.max(1, Number(e.target.value) || 1),
-                  attempts: Math.max(draft.attempts, Number(e.target.value) || 1),
-                })
-              }
-              className="w-full px-2 py-1.5 rounded bg-panel border border-white/20 focus:border-gold outline-none text-sm disabled:opacity-30"
+              onChange={(e) => update({ zone_attempts: Math.max(1, Number(e.target.value) || 1) })}
+              className="w-16 px-2 py-1 rounded bg-panel border border-white/20 focus:border-gold outline-none text-sm text-center disabled:opacity-25"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="flex items-center gap-2 text-sm mb-1">
-              <input type="checkbox" checked={draft.top} onChange={(e) => setTop(e.target.checked)} />
-              <span className="font-semibold">Top</span>
-            </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={draft.top}
+              onChange={(e) => setTop(e.target.checked)}
+            />
+            <span className="font-semibold">Top</span>
+            <span className="text-white/40 text-xs">na tentativa</span>
             <input
               type="number"
               min={1}
               disabled={!draft.top}
-              placeholder="tent."
               value={draft.top_attempts || ''}
-              onChange={(e) =>
-                update({
-                  top_attempts: Math.max(1, Number(e.target.value) || 1),
-                  attempts: Math.max(draft.attempts, Number(e.target.value) || 1),
-                })
-              }
-              className="w-full px-2 py-1.5 rounded bg-panel border border-white/20 focus:border-gold outline-none text-sm disabled:opacity-30"
+              onChange={(e) => update({ top_attempts: Math.max(1, Number(e.target.value) || 1) })}
+              className="w-16 px-2 py-1 rounded bg-panel border border-white/20 focus:border-gold outline-none text-sm text-center disabled:opacity-25"
             />
-          </div>
+          </label>
+
+          <label
+            className="flex items-center gap-2 text-sm ml-auto"
+            title="Marque quando o atleta escalou mas não conseguiu zona nem top. Sem isso ele seria contado como ausente (DNS)."
+          >
+            <input
+              type="checkbox"
+              checked={draft.attempted}
+              disabled={draft.zone || draft.top}
+              onChange={(e) => update({ attempted: e.target.checked })}
+            />
+            <span className={touched ? 'text-white/70' : 'text-white/40'}>Escalou</span>
+          </label>
         </div>
       </fieldset>
     </div>
@@ -169,7 +179,7 @@ export default function StaffPanel() {
   const { rounds, activeRound, getRound, loading, refresh } = useEvent('Boulder');
 
   const [roundId, setRoundId] = useState(null);
-  const [athleteId, setAthleteId] = useState('');
+  const [boulderId, setBoulderId] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
@@ -183,20 +193,27 @@ export default function StaffPanel() {
     [getRound, roundId]
   );
 
-  // Monta o rascunho a partir do que já está salvo, sempre que muda o atleta.
+  // Ao trocar de fase, cai no primeiro boulder dela.
   useEffect(() => {
-    if (!athleteId) {
+    if (boulders.length === 0) {
+      setBoulderId(null);
+      return;
+    }
+    if (!boulders.some((b) => b.id === boulderId)) setBoulderId(boulders[0].id);
+  }, [boulders, boulderId]);
+
+  // Monta os rascunhos de todos os atletas para o boulder selecionado.
+  useEffect(() => {
+    if (!boulderId) {
       setDrafts({});
       return;
     }
     const next = {};
-    boulders.forEach((boulder) => {
-      const saved = scores.find(
-        (s) => s.athlete_id === athleteId && s.boulder_id === boulder.id
-      );
-      next[boulder.id] = saved
+    athletes.forEach((a) => {
+      const saved = scores.find((s) => s.athlete_id === a.id && s.boulder_id === boulderId);
+      next[a.id] = saved
         ? {
-            attempts: saved.attempts ?? 0,
+            attempted: saved.attempted ?? participated(saved),
             zone: saved.zone,
             zone_attempts: saved.zone_attempts ?? 0,
             top: saved.top,
@@ -208,22 +225,18 @@ export default function StaffPanel() {
     setDrafts(next);
     setSavedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [athleteId, roundId, scores.length, boulders.length]);
+  }, [boulderId, roundId, athletes.length, scores.length]);
 
-  const savedFor = (boulderId) =>
+  const savedFor = (athleteId) =>
     scores.find((s) => s.athlete_id === athleteId && s.boulder_id === boulderId) ?? null;
 
-  const isDirty = (boulderId) => {
-    const draft = drafts[boulderId];
+  const isDirty = (athleteId) => {
+    const draft = drafts[athleteId];
     if (!draft) return false;
-    const saved = savedFor(boulderId);
-    if (!saved) {
-      return (
-        draft.attempts > 0 || draft.zone || draft.top || draft.locked
-      );
-    }
+    const saved = savedFor(athleteId);
+    if (!saved) return draft.attempted || draft.zone || draft.top || draft.locked;
     return (
-      draft.attempts !== (saved.attempts ?? 0) ||
+      draft.attempted !== (saved.attempted ?? participated(saved)) ||
       draft.zone !== saved.zone ||
       draft.zone_attempts !== (saved.zone_attempts ?? 0) ||
       draft.top !== saved.top ||
@@ -232,22 +245,31 @@ export default function StaffPanel() {
     );
   };
 
-  const dirtyCount = boulders.filter((b) => isDirty(b.id)).length;
-  const roundTotal = boulders.reduce((sum, b) => sum + boulderScore(drafts[b.id]), 0);
+  const dirtyIds = athletes.filter((a) => isDirty(a.id)).map((a) => a.id);
+  const registered = athletes.filter((a) => participated(drafts[a.id])).length;
+  const boulder = boulders.find((b) => b.id === boulderId) ?? null;
 
   const handleSave = async () => {
-    if (!athleteId || dirtyCount === 0) return;
+    if (dirtyIds.length === 0 || !boulderId) return;
     setSaving(true);
 
-    const rows = boulders
-      .filter((b) => isDirty(b.id))
-      .map((b) => ({
+    const rows = dirtyIds.map((athleteId) => {
+      const draft = drafts[athleteId];
+      return {
         athlete_id: athleteId,
-        boulder_id: b.id,
-        ...drafts[b.id],
+        boulder_id: boulderId,
+        attempted: draft.attempted || draft.zone || draft.top,
+        zone: draft.zone,
+        zone_attempts: draft.zone_attempts,
+        top: draft.top,
+        top_attempts: draft.top_attempts,
+        // total calculado, nunca digitado
+        attempts: attemptsOf(draft),
+        locked: draft.locked,
         updated_by: profile?.id ?? null,
         updated_at: new Date().toISOString(),
-      }));
+      };
+    });
 
     const { error } = await supabase
       .from('scores')
@@ -265,15 +287,15 @@ export default function StaffPanel() {
     navigate('/comp/staff/login');
   };
 
-  const selectedAthlete = athletes.find((a) => a.id === athleteId) ?? null;
-
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
           <div>
-            <p className="text-gold uppercase tracking-widest text-xs">Staff — Arbitragem</p>
-            <h1 className="text-2xl font-bold">Painel de pontuação</h1>
+            <h1 className="text-lg sm:text-xl font-extrabold text-gold tracking-tight">
+              {EVENT_TITLE}
+            </h1>
+            <p className="text-white/60 text-sm mt-0.5">Staff — Painel de pontuação</p>
           </div>
           <div className="flex gap-4 items-center text-sm">
             <Link to="/comp/staff/ranking" className="text-white/70 hover:text-white">
@@ -285,7 +307,7 @@ export default function StaffPanel() {
           </div>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />
         </div>
 
@@ -295,54 +317,65 @@ export default function StaffPanel() {
           <p className="text-center text-white/60 py-12">Nenhuma fase configurada.</p>
         ) : (
           <>
-            <div className="bg-panel2 border border-white/10 rounded-xl p-5 mb-6">
-              <label className="block text-sm text-white/70 mb-1">Atleta</label>
-              <select
-                value={athleteId}
-                onChange={(e) => setAthleteId(e.target.value)}
-                className="w-full px-3 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none"
-              >
-                <option value="">Selecione o atleta...</option>
-                {athletes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.bib_number ? `#${a.bib_number} ` : ''}
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              {athletes.length === 0 && (
-                <p className="text-white/40 text-xs mt-2">
-                  Nenhum atleta inscrito nesta fase. O Controle de Atletas precisa inscrevê-los
-                  primeiro.
-                </p>
-              )}
+            {/* Escolha do boulder */}
+            <div className="mb-6">
+              <p className="text-white/50 text-xs uppercase tracking-wide mb-2">
+                Boulder que você está arbitrando
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {boulders.map((b) => {
+                  const done = athletes.filter((a) =>
+                    participated(scores.find((s) => s.athlete_id === a.id && s.boulder_id === b.id))
+                  ).length;
+                  const selected = b.id === boulderId;
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => setBoulderId(b.id)}
+                      className={`px-4 py-2.5 rounded-lg border font-bold transition ${
+                        selected
+                          ? 'bg-gold text-panel border-gold'
+                          : 'bg-panel2 text-white/70 border-white/10 hover:border-white/30 hover:text-white'
+                      }`}
+                    >
+                      B{b.number}
+                      <span
+                        className={`ml-2 text-xs font-normal ${
+                          selected ? 'text-panel/60' : 'text-white/30'
+                        }`}
+                      >
+                        {done}/{athletes.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {selectedAthlete && (
+            {athletes.length === 0 ? (
+              <p className="text-center text-white/40 py-12 border border-dashed border-white/10 rounded-xl">
+                Nenhum atleta inscrito nesta fase. O Controle de Atletas precisa inscrevê-los
+                primeiro.
+              </p>
+            ) : (
               <>
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-bold">
-                    {selectedAthlete.bib_number ? `#${selectedAthlete.bib_number} ` : ''}
-                    {selectedAthlete.name}
+                    {boulder ? `Boulder ${boulder.number}` : '—'}
                   </h2>
-                  <div className="text-right">
-                    <p className="text-white/50 text-xs uppercase tracking-wide">Total da fase</p>
-                    <p className="text-2xl font-extrabold text-gold tabular-nums">
-                      {formatScore(roundTotal)}
-                    </p>
-                  </div>
+                  <p className="text-white/40 text-sm tabular-nums">
+                    {registered} de {athletes.length} lançados
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                  {boulders.map((boulder) => (
-                    <BoulderCard
-                      key={boulder.id}
-                      boulder={boulder}
-                      draft={drafts[boulder.id] ?? EMPTY_ROW}
-                      dirty={isDirty(boulder.id)}
-                      onChange={(next) =>
-                        setDrafts((prev) => ({ ...prev, [boulder.id]: next }))
-                      }
+                <div className="space-y-3 mb-6">
+                  {athletes.map((a) => (
+                    <AthleteRow
+                      key={a.id}
+                      athlete={a}
+                      draft={drafts[a.id] ?? EMPTY_ROW}
+                      dirty={isDirty(a.id)}
+                      onChange={(next) => setDrafts((prev) => ({ ...prev, [a.id]: next }))}
                     />
                   ))}
                 </div>
@@ -350,16 +383,16 @@ export default function StaffPanel() {
                 <div className="sticky bottom-4">
                   <button
                     onClick={handleSave}
-                    disabled={dirtyCount === 0 || saving}
+                    disabled={dirtyIds.length === 0 || saving}
                     className="w-full bg-gold text-panel font-bold py-3 rounded-xl shadow-lg hover:opacity-90 disabled:opacity-40"
                   >
                     {saving
                       ? 'Salvando...'
-                      : dirtyCount === 0
+                      : dirtyIds.length === 0
                       ? 'Tudo salvo'
-                      : `Salvar ${dirtyCount} boulder${dirtyCount > 1 ? 's' : ''}`}
+                      : `Salvar ${dirtyIds.length} atleta${dirtyIds.length > 1 ? 's' : ''}`}
                   </button>
-                  {savedAt && dirtyCount === 0 && (
+                  {savedAt && dirtyIds.length === 0 && (
                     <p className="text-center text-white/40 text-xs mt-2">
                       Salvo às {savedAt.toLocaleTimeString('pt-BR')}
                     </p>
