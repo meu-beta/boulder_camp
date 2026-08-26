@@ -52,7 +52,7 @@ export default function PublicInsights() {
           </h1>
           <p className="text-white/60 text-sm mt-0.5">Insights do evento — Boulder</p>
         </div>
-        <nav className="flex gap-4 text-sm text-white/70">
+        <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/70">
           <Link to="/comp" className="hover:text-white">
             Ranking
           </Link>

@@ -15,6 +15,13 @@ import PhaseTabs from '../components/PhaseTabs';
 // conquistado). O total de tentativas é calculado — é a tentativa da
 // última conquista — e aparece apenas como leitura.
 
+// Alvos de toque grandes: o arbitro lanca pontuacao em pe, no celular.
+// O checkbox padrao (~13px) e pequeno demais; 24px fica confortavel.
+// text-base no input evita o zoom automatico do Safari no iPhone.
+const CHECKBOX = 'w-6 h-6 rounded accent-gold shrink-0 cursor-pointer';
+const NUMBER_INPUT =
+  'w-16 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
+
 const EMPTY_ROW = {
   attempted: false,
   zone: false,
@@ -106,7 +113,7 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
           <button
             onClick={() => update({ locked: !locked })}
             title={locked ? 'Destravar para editar' : 'Travar contra edição acidental'}
-            className={`p-1.5 rounded-md border transition ${
+            className={`p-2.5 rounded-md border transition ${
               locked
                 ? 'border-gold/40 text-gold bg-gold/10'
                 : 'border-white/15 text-white/40 hover:text-white hover:border-white/30'
@@ -124,16 +131,18 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
               type="checkbox"
               checked={draft.zone}
               onChange={(e) => setZone(e.target.checked)}
+            className={CHECKBOX}
             />
             <span className="font-semibold">Zona</span>
             <span className="text-white/40 text-xs">na tentativa</span>
             <input
               type="number"
+              inputMode="numeric"
               min={1}
               disabled={!draft.zone}
               value={draft.zone_attempts || ''}
               onChange={(e) => update({ zone_attempts: Math.max(1, Number(e.target.value) || 1) })}
-              className="w-16 px-2 py-1 rounded bg-panel border border-white/20 focus:border-gold outline-none text-sm text-center disabled:opacity-25"
+              className={NUMBER_INPUT}
             />
           </label>
 
@@ -142,21 +151,23 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
               type="checkbox"
               checked={draft.top}
               onChange={(e) => setTop(e.target.checked)}
+            className={CHECKBOX}
             />
             <span className="font-semibold">Top</span>
             <span className="text-white/40 text-xs">na tentativa</span>
             <input
               type="number"
+              inputMode="numeric"
               min={1}
               disabled={!draft.top}
               value={draft.top_attempts || ''}
               onChange={(e) => update({ top_attempts: Math.max(1, Number(e.target.value) || 1) })}
-              className="w-16 px-2 py-1 rounded bg-panel border border-white/20 focus:border-gold outline-none text-sm text-center disabled:opacity-25"
+              className={NUMBER_INPUT}
             />
           </label>
 
           <label
-            className="flex items-center gap-2 text-sm ml-auto"
+            className="flex items-center gap-2 text-sm sm:ml-auto"
             title="Marque quando o atleta escalou mas não conseguiu zona nem top. Sem isso ele seria contado como ausente (DNS)."
           >
             <input
@@ -164,6 +175,7 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
               checked={draft.attempted}
               disabled={draft.zone || draft.top}
               onChange={(e) => update({ attempted: e.target.checked })}
+            className={CHECKBOX}
             />
             <span className={touched ? 'text-white/70' : 'text-white/40'}>Escalou</span>
           </label>

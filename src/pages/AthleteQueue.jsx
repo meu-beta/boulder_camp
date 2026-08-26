@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   DndContext,
   closestCenter,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -140,8 +141,8 @@ function QueueRow({
         <button
           {...attributes}
           {...listeners}
-          className="cursor-grab text-white/25 hover:text-white px-1 text-lg leading-none"
-          title="Arrastar para reordenar"
+          className="cursor-grab touch-none select-none text-white/25 hover:text-white px-2 py-2 -my-1 text-lg leading-none"
+          title="Arrastar para reordenar (no celular, segure e arraste)"
         >
           ⠿
         </button>
@@ -349,7 +350,13 @@ export default function AthleteQueue() {
     return map;
   }, [scores, queue]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // No mouse, arrastar 5px ja inicia. No dedo, um sensor de ponteiro competiria
+  // com a rolagem da pagina, entao o toque usa press-and-hold: segurar ~220ms
+  // para arrastar, e um deslize rapido continua rolando a lista normalmente.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } })
+  );
 
   const queuedIds = new Set(queue.map((q) => q.athlete_id));
   const available = athletes.filter((a) => !queuedIds.has(a.id));

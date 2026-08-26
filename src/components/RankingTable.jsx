@@ -36,18 +36,22 @@ export default function RankingTable({ ranking, title = 'RANKING', advanceCount 
   return (
     <div className="w-full max-w-5xl mx-auto">
       {title ? (
-        <h2 className="text-3xl font-extrabold tracking-widest mb-4 text-white">{title}</h2>
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-widest mb-4 text-white">
+          {title}
+        </h2>
       ) : null}
-      <div className="rounded-lg overflow-hidden border border-white/10">
-        <table className="w-full text-left">
+      {/* No celular a tabela nao cabe inteira: em vez de cortar (overflow-hidden),
+          ela rola na horizontal. */}
+      <div className="rounded-lg border border-white/10 overflow-x-auto overscroll-x-contain">
+        <table className="w-full min-w-[480px] text-left">
           <thead>
             <tr className="bg-panel2 text-xs uppercase text-white/60">
-              <th className="py-2 px-3 w-12">#</th>
-              <th className="py-2 px-3">Atleta</th>
-              <th className="py-2 px-3">Boulders</th>
-              <th className="py-2 px-3 text-right w-28">Pontos</th>
-              <th className="py-2 px-3 text-center w-16">Top</th>
-              <th className="py-2 px-3 text-center w-16">Zona</th>
+              <th className="py-2.5 px-2 sm:px-3 w-12">#</th>
+              <th className="py-2.5 px-2 sm:px-3">Atleta</th>
+              <th className="py-2.5 px-2 sm:px-3">Boulders</th>
+              <th className="py-2.5 px-2 sm:px-3 text-right w-28">Pontos</th>
+              <th className="py-2.5 px-2 sm:px-3 text-center w-16">Top</th>
+              <th className="py-2.5 px-2 sm:px-3 text-center w-16">Zona</th>
             </tr>
           </thead>
           <tbody>
@@ -64,24 +68,24 @@ export default function RankingTable({ ranking, title = 'RANKING', advanceCount 
                     row.status !== 'ranked' ? 'opacity-50' : ''
                   }`}
                 >
-                  <td className="py-2 px-3 font-bold text-gold">
+                  <td className="py-2.5 px-2 sm:px-3 font-bold text-gold">
                     {row.rank ?? <StatusBadge status={row.status} />}
                   </td>
-                  <td className="py-2 px-3 font-semibold">
+                  <td className="py-2.5 px-2 sm:px-3 font-semibold">
                     <span className="mr-2">{FLAGS[row.athlete.country_code] ?? '🏳️'}</span>
                     {row.athlete.bib_number ? (
                       <span className="text-white/40 mr-1">#{row.athlete.bib_number}</span>
                     ) : null}
                     {row.athlete.name}
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2.5 px-2 sm:px-3">
                     <BoulderSquares boulderIds={row.boulderIds} byBoulder={row.byBoulder} />
                   </td>
-                  <td className="py-2 px-3 text-right font-bold text-gold text-lg tabular-nums">
+                  <td className="py-2.5 px-2 sm:px-3 text-right font-bold text-gold text-lg tabular-nums">
                     {formatScore(row.total)}
                   </td>
-                  <td className="py-2 px-3 text-center tabular-nums">{row.tops}</td>
-                  <td className="py-2 px-3 text-center tabular-nums">{row.zones}</td>
+                  <td className="py-2.5 px-2 sm:px-3 text-center tabular-nums">{row.tops}</td>
+                  <td className="py-2.5 px-2 sm:px-3 text-center tabular-nums">{row.zones}</td>
                 </tr>
               );
             })}
