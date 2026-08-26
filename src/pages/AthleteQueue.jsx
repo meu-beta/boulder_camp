@@ -17,6 +17,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { useEvent } from '../lib/useEvent';
+import { participated } from '../lib/scoring';
+import { EVENT_TITLE } from '../lib/event';
 import PhaseTabs from '../components/PhaseTabs';
 
 const ON_WALL_LIMIT = 2;
@@ -30,47 +32,66 @@ function elapsedSince(iso, now) {
 }
 
 /**
- * Trilha de boulders já feitos pelo atleta nesta fase.
- *
- * Dourado cheio    = o operador marcou "Concluir" com esse boulder selecionado
- * Contorno dourado = o árbitro já lançou pontuação (o atleta escalou)
- * Apagado          = ainda não entrou
- *
- * Clicar alterna o registro da fila — serve para corrigir um engano.
+ * Boulder em que o atleta começa o rodízio.
+ * Por padrão distribui pelo número de peito: peito 1 começa no B1, peito 2
+ * no B2, e assim por diante, voltando ao início quando acaba.
  */
-function BoulderTrack({ boulders, doneIds, scoredIds, currentId, onToggle }) {
+function startIndexFor(athlete, total) {
+  if (total <= 0) return 0;
+  const bib = athlete?.bib_number;
+  if (typeof bib === 'number' && bib > 0) return (bib - 1) % total;
+  return 0;
+}
+
+/**
+ * Próximo boulder do rodízio: começa no boulder inicial do atleta e anda em
+ * círculo até achar um que ele ainda não encarou. Retorna null se já fez todos.
+ */
+function nextBoulderId(athlete, boulders, doneIds) {
+  const total = boulders.length;
+  if (total === 0) return null;
+  const start = startIndexFor(athlete, total);
+  for (let n = 0; n < total; n += 1) {
+    const candidate = boulders[(start + n) % total];
+    if (!doneIds.has(candidate.id)) return candidate.id;
+  }
+  return null;
+}
+
+/**
+ * Trilha de boulders já encarados pelo atleta nesta fase.
+ * Acende sozinha a partir do que o árbitro lançou no painel de pontuação,
+ * e também com o "Concluir" marcado aqui na fila.
+ */
+function BoulderTrack({ boulders, doneIds, nextId }) {
   if (boulders.length === 0) return null;
 
   return (
     <div className="flex items-center gap-1">
       <span className="text-[10px] uppercase tracking-wide text-white/30 mr-1">Já fez</span>
       {boulders.map((b) => {
-        const done = doneIds.includes(b.id);
-        const scored = scoredIds.has(b.id);
-        const current = b.id === currentId;
-
-        let style = 'border-white/15 text-white/25';
-        let title = `Boulder ${b.number} — ainda não entrou`;
-
-        if (done) {
-          style = 'bg-gold border-gold text-panel font-bold';
-          title = `Boulder ${b.number} — concluído (clique para desfazer)`;
-        } else if (scored) {
-          style = 'border-gold/60 text-gold';
-          title = `Boulder ${b.number} — pontuação já registrada pelo árbitro`;
-        }
-
+        const done = doneIds.has(b.id);
+        const isNext = b.id === nextId;
         return (
-          <button
+          <span
             key={b.id}
-            onClick={() => onToggle(b.id)}
-            title={title}
-            className={`w-6 h-6 rounded border text-[11px] leading-none transition ${style} ${
-              current ? 'ring-2 ring-gold/50 ring-offset-1 ring-offset-panel2' : ''
+            title={
+              done
+                ? `Boulder ${b.number} — já encarado`
+                : isNext
+                ? `Boulder ${b.number} — próximo do rodízio`
+                : `Boulder ${b.number} — ainda não`
+            }
+            className={`w-6 h-6 rounded border text-[11px] leading-none flex items-center justify-center ${
+              done
+                ? 'bg-gold border-gold text-panel font-bold'
+                : isNext
+                ? 'border-gold/70 text-gold'
+                : 'border-white/15 text-white/25'
             }`}
           >
             {b.number}
-          </button>
+          </span>
         );
       })}
     </div>
@@ -80,11 +101,11 @@ function BoulderTrack({ boulders, doneIds, scoredIds, currentId, onToggle }) {
 function QueueRow({
   entry,
   boulders,
-  scoredIds,
+  doneIds,
+  nextId,
   onSetStatus,
   onRemove,
   onSetBoulder,
-  onToggleDone,
   canGoOnWall,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -103,13 +124,9 @@ function QueueRow({
     done: 'text-white/30',
   };
 
-  const statusLabel = {
-    waiting: 'Aguardando',
-    on_wall: 'Na parede',
-    done: 'Concluído',
-  };
-
-  const doneIds = entry.done_boulders ?? [];
+  const statusLabel = { waiting: 'Aguardando', on_wall: 'Na parede', done: 'Concluído' };
+  const shown = entry.boulder_id ?? nextId;
+  const finishedAll = nextId === null && !entry.boulder_id;
 
   return (
     <div
@@ -119,7 +136,6 @@ function QueueRow({
         entry.status === 'on_wall' ? 'bg-gold/10 border-gold/40' : 'bg-panel2 border-white/10'
       }`}
     >
-      {/* Linha de cima: identificação e ações */}
       <div className="flex items-center gap-3">
         <button
           {...attributes}
@@ -146,7 +162,7 @@ function QueueRow({
         {entry.status !== 'on_wall' && (
           <button
             onClick={() => onSetStatus(entry.id, 'on_wall')}
-            disabled={!canGoOnWall}
+            disabled={!canGoOnWall || finishedAll}
             className="text-xs px-3 py-1 rounded bg-gold text-panel font-bold disabled:opacity-25"
           >
             Chamar
@@ -170,33 +186,27 @@ function QueueRow({
         </button>
       </div>
 
-      {/* Linha de baixo: histórico de boulders e o próximo a encarar */}
       <div className="flex items-center gap-3 mt-2 pl-9 flex-wrap">
-        <BoulderTrack
-          boulders={boulders}
-          doneIds={doneIds}
-          scoredIds={scoredIds}
-          currentId={entry.boulder_id}
-          onToggle={(boulderId) => onToggleDone(entry.id, boulderId)}
-        />
+        <BoulderTrack boulders={boulders} doneIds={doneIds} nextId={shown} />
 
         <div className="flex items-center gap-1 ml-auto">
           <span className="text-[10px] uppercase tracking-wide text-white/30">Próximo</span>
-          <select
-            value={entry.boulder_id ?? ''}
-            onChange={(e) =>
-              onSetBoulder(entry.id, e.target.value ? Number(e.target.value) : null)
-            }
-            className="text-xs px-2 py-1 rounded bg-panel border border-white/15 text-white/70 focus:border-gold outline-none"
-            title="Boulder que o atleta vai encarar"
-          >
-            <option value="">—</option>
-            {boulders.map((b) => (
-              <option key={b.id} value={b.id}>
-                B{b.number}
-              </option>
-            ))}
-          </select>
+          {finishedAll ? (
+            <span className="text-xs text-gold/70 px-2">completou todos</span>
+          ) : (
+            <select
+              value={entry.boulder_id ?? nextId ?? ''}
+              onChange={(e) => onSetBoulder(entry.id, e.target.value ? Number(e.target.value) : null)}
+              className="text-xs px-2 py-1 rounded bg-panel border border-white/15 text-white/70 focus:border-gold outline-none"
+              title="Calculado pelo rodízio. Pode trocar se precisar."
+            >
+              {boulders.map((b) => (
+                <option key={b.id} value={b.id}>
+                  B{b.number}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
     </div>
@@ -206,47 +216,93 @@ function QueueRow({
 /** Painel lateral fixo com quem está escalando agora. */
 function OnWallPanel({ entries, boulders, now, onSetStatus }) {
   return (
-    <aside className="lg:w-72 shrink-0">
-      <div className="lg:sticky lg:top-6 space-y-3">
-        <h2 className="text-xs uppercase tracking-widest text-gold flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
-          Na parede agora
-        </h2>
+    <div className="space-y-3">
+      <h2 className="text-xs uppercase tracking-widest text-gold flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+        Na parede agora
+      </h2>
 
-        {entries.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">
-            <p className="text-white/30 text-sm">Nenhum atleta na parede.</p>
-            <p className="text-white/20 text-xs mt-1">Use o botão "Chamar" na fila ao lado.</p>
-          </div>
-        ) : (
-          entries.map((entry) => {
-            const boulder = boulders.find((b) => b.id === entry.boulder_id);
-            return (
-              <div key={entry.id} className="rounded-xl border border-gold/40 bg-gold/10 p-4">
-                <p className="text-lg font-bold text-white leading-tight">
-                  {entry.athlete?.bib_number ? (
-                    <span className="text-gold/70 mr-1">#{entry.athlete.bib_number}</span>
-                  ) : null}
-                  {entry.athlete?.name ?? '—'}
-                </p>
-                <p className="text-gold text-sm mt-1">
-                  {boulder ? `Boulder ${boulder.number}` : 'Boulder não definido'}
-                </p>
-                <p className="text-white/50 text-xs mt-2 tabular-nums">
-                  na parede há {elapsedSince(entry.on_wall_since, now) ?? '—'}
-                </p>
-                <button
-                  onClick={() => onSetStatus(entry.id, 'done')}
-                  className="mt-3 w-full py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold hover:bg-white/20"
-                >
-                  Concluir
-                </button>
+      {entries.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">
+          <p className="text-white/30 text-sm">Nenhum atleta na parede.</p>
+          <p className="text-white/20 text-xs mt-1">Use o botão "Chamar" na fila ao lado.</p>
+        </div>
+      ) : (
+        entries.map((entry) => {
+          const boulder = boulders.find((b) => b.id === entry.boulder_id);
+          return (
+            <div key={entry.id} className="rounded-xl border border-gold/40 bg-gold/10 p-4">
+              <p className="text-lg font-bold text-white leading-tight">
+                {entry.athlete?.bib_number ? (
+                  <span className="text-gold/70 mr-1">#{entry.athlete.bib_number}</span>
+                ) : null}
+                {entry.athlete?.name ?? '—'}
+              </p>
+              <p className="text-gold text-sm mt-1">
+                {boulder ? `Boulder ${boulder.number}` : 'Boulder não definido'}
+              </p>
+              <p className="text-white/50 text-xs mt-2 tabular-nums">
+                na parede há {elapsedSince(entry.on_wall_since, now) ?? '—'}
+              </p>
+              <button
+                onClick={() => onSetStatus(entry.id, 'done')}
+                className="mt-3 w-full py-1.5 rounded-lg bg-white/10 text-white text-xs font-bold hover:bg-white/20"
+              >
+                Concluir
+              </button>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/** Resumo por boulder: quem já encarou cada um. */
+function BoulderSummary({ boulders, athletes, doneByAthlete }) {
+  if (boulders.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xs uppercase tracking-widest text-white/40">Resumo por boulder</h2>
+      <div className="space-y-2">
+        {boulders.map((b) => {
+          const feitos = athletes.filter((a) => doneByAthlete.get(a.id)?.has(b.id));
+          const pct = athletes.length ? Math.round((feitos.length / athletes.length) * 100) : 0;
+
+          return (
+            <div key={b.id} className="rounded-xl border border-white/10 bg-panel2 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-gold">Boulder {b.number}</span>
+                <span className="text-white/50 text-xs tabular-nums">
+                  {feitos.length}/{athletes.length}
+                </span>
               </div>
-            );
-          })
-        )}
+
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-2">
+                <div className="h-full bg-gold transition-all" style={{ width: `${pct}%` }} />
+              </div>
+
+              {feitos.length === 0 ? (
+                <p className="text-white/25 text-xs">Ninguém encarou ainda.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {feitos.map((a) => (
+                    <span
+                      key={a.id}
+                      className="text-[11px] px-1.5 py-0.5 rounded bg-white/5 text-white/60"
+                      title={a.name}
+                    >
+                      {a.bib_number ? `#${a.bib_number}` : a.name.split(' ')[0]}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -263,7 +319,6 @@ export default function AthleteQueue() {
     if (!roundId && activeRound) setRoundId(activeRound.id);
   }, [activeRound, roundId]);
 
-  // Relógio para o "há quanto tempo" do painel lateral.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -274,23 +329,35 @@ export default function AthleteQueue() {
     [getRound, roundId]
   );
 
-  // Boulders em que cada atleta já tem tentativa lançada pelo árbitro.
-  const scoredByAthlete = useMemo(() => {
+  /**
+   * Boulders já encarados por atleta. Junta duas fontes:
+   *  - o que o árbitro lançou no painel de pontuação (fonte principal)
+   *  - o "Concluir" marcado aqui na fila, que chega antes do lançamento
+   */
+  const doneByAthlete = useMemo(() => {
     const map = new Map();
+    const add = (athleteId, boulderId) => {
+      if (!map.has(athleteId)) map.set(athleteId, new Set());
+      map.get(athleteId).add(boulderId);
+    };
     scores.forEach((s) => {
-      if ((s.attempts || 0) <= 0) return;
-      if (!map.has(s.athlete_id)) map.set(s.athlete_id, new Set());
-      map.get(s.athlete_id).add(s.boulder_id);
+      if (participated(s)) add(s.athlete_id, s.boulder_id);
+    });
+    queue.forEach((q) => {
+      (q.done_boulders ?? []).forEach((bid) => add(q.athlete_id, bid));
     });
     return map;
-  }, [scores]);
+  }, [scores, queue]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const queuedIds = new Set(queue.map((q) => q.athlete_id));
   const available = athletes.filter((a) => !queuedIds.has(a.id));
   const onWall = queue.filter((q) => q.status === 'on_wall');
-  const waiting = queue.filter((q) => q.status !== 'on_wall');
+  const waiting = queue.filter((q) => q.status === 'waiting');
+
+  const doneFor = (athleteId) => doneByAthlete.get(athleteId) ?? new Set();
+  const suggestFor = (entry) => nextBoulderId(entry.athlete, boulders, doneFor(entry.athlete_id));
 
   const persistOrder = async (list) => {
     await Promise.all(
@@ -316,26 +383,23 @@ export default function AthleteQueue() {
       on_wall_since: status === 'on_wall' ? new Date().toISOString() : null,
     };
 
-    // Ao concluir, guarda o boulder que o atleta acabou de encarar. É esse
-    // registro que alimenta a trilha "Já fez" da linha dele.
-    if (status === 'done' && entry?.boulder_id) {
+    if (status === 'on_wall' && !entry?.boulder_id) {
+      changes.boulder_id = suggestFor(entry);
+    }
+
+    // Ao concluir, marca o boulder como feito e já engata o próximo do rodízio.
+    if (status === 'done' && entry) {
+      const boulderDone = entry.boulder_id ?? suggestFor(entry);
       const current = entry.done_boulders ?? [];
-      if (!current.includes(entry.boulder_id)) {
-        changes.done_boulders = [...current, entry.boulder_id];
-      }
+      const updated =
+        boulderDone && !current.includes(boulderDone) ? [...current, boulderDone] : current;
+      changes.done_boulders = updated;
+
+      const doneSet = new Set([...doneFor(entry.athlete_id), ...updated]);
+      changes.boulder_id = nextBoulderId(entry.athlete, boulders, doneSet);
     }
 
     await supabase.from('queue_entries').update(changes).eq('id', id);
-    refresh();
-  };
-
-  const handleToggleDone = async (id, boulderId) => {
-    const entry = queue.find((q) => q.id === id);
-    const current = entry?.done_boulders ?? [];
-    const next = current.includes(boulderId)
-      ? current.filter((x) => x !== boulderId)
-      : [...current, boulderId];
-    await supabase.from('queue_entries').update({ done_boulders: next }).eq('id', id);
     refresh();
   };
 
@@ -351,9 +415,11 @@ export default function AthleteQueue() {
 
   const handleAdd = async () => {
     if (!addingId || !round) return;
+    const athlete = athletes.find((a) => a.id === addingId);
     await supabase.from('queue_entries').insert({
       athlete_id: addingId,
       round_id: round.id,
+      boulder_id: nextBoulderId(athlete, boulders, doneFor(addingId)),
       position: queue.length + 1,
       status: 'waiting',
     });
@@ -362,7 +428,7 @@ export default function AthleteQueue() {
   };
 
   const handleCallNext = async () => {
-    const next = waiting.find((q) => q.status === 'waiting');
+    const next = waiting[0];
     if (!next || onWall.length >= ON_WALL_LIMIT) return;
     handleSetStatus(next.id, 'on_wall');
   };
@@ -372,6 +438,7 @@ export default function AthleteQueue() {
     const rows = available.map((a, index) => ({
       athlete_id: a.id,
       round_id: round.id,
+      boulder_id: nextBoulderId(a, boulders, doneFor(a.id)),
       position: queue.length + index + 1,
       status: 'waiting',
     }));
@@ -386,11 +453,13 @@ export default function AthleteQueue() {
 
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
           <div>
-            <p className="text-gold uppercase tracking-widest text-xs">Controle de Atletas</p>
-            <h1 className="text-2xl font-bold">Fila de entrada</h1>
+            <h1 className="text-lg sm:text-xl font-extrabold text-gold tracking-tight">
+              {EVENT_TITLE}
+            </h1>
+            <p className="text-white/60 text-sm mt-0.5">Controle de Atletas — Fila de entrada</p>
           </div>
           <div className="flex gap-4 items-center text-sm">
             <Link to="/comp/athlete-control/register" className="text-white/70 hover:text-white">
@@ -418,7 +487,6 @@ export default function AthleteQueue() {
           <p className="text-center text-white/60 py-12">Nenhuma fase configurada.</p>
         ) : (
           <div className="flex flex-col-reverse lg:flex-row gap-6">
-            {/* Fila */}
             <div className="flex-1 min-w-0">
               <div className="flex gap-2 mb-3">
                 <select
@@ -446,9 +514,7 @@ export default function AthleteQueue() {
               <div className="flex gap-2 mb-5 flex-wrap">
                 <button
                   onClick={handleCallNext}
-                  disabled={
-                    !waiting.some((q) => q.status === 'waiting') || onWall.length >= ON_WALL_LIMIT
-                  }
+                  disabled={waiting.length === 0 || onWall.length >= ON_WALL_LIMIT}
                   className="px-4 py-2 rounded-lg bg-gold/20 border border-gold/50 text-gold text-sm font-bold disabled:opacity-25"
                 >
                   Chamar próximo
@@ -480,10 +546,10 @@ export default function AthleteQueue() {
                         key={entry.id}
                         entry={entry}
                         boulders={boulders}
-                        scoredIds={scoredByAthlete.get(entry.athlete_id) ?? new Set()}
+                        doneIds={doneFor(entry.athlete_id)}
+                        nextId={suggestFor(entry)}
                         onSetStatus={handleSetStatus}
                         onSetBoulder={handleSetBoulder}
-                        onToggleDone={handleToggleDone}
                         onRemove={handleRemove}
                         canGoOnWall={onWall.length < ON_WALL_LIMIT}
                       />
@@ -498,12 +564,21 @@ export default function AthleteQueue() {
               </DndContext>
             </div>
 
-            <OnWallPanel
-              entries={onWall}
-              boulders={boulders}
-              now={now}
-              onSetStatus={handleSetStatus}
-            />
+            <aside className="lg:w-80 shrink-0 space-y-6">
+              <div className="lg:sticky lg:top-6 space-y-6">
+                <OnWallPanel
+                  entries={onWall}
+                  boulders={boulders}
+                  now={now}
+                  onSetStatus={handleSetStatus}
+                />
+                <BoulderSummary
+                  boulders={boulders}
+                  athletes={athletes}
+                  doneByAthlete={doneByAthlete}
+                />
+              </div>
+            </aside>
           </div>
         )}
       </div>
