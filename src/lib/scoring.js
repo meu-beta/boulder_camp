@@ -24,6 +24,33 @@ function round1(n) {
   return Math.round(n * 10) / 10;
 }
 
+/**
+ * Total de tentativas de um boulder, calculado — não digitado.
+ * É a tentativa em que a última conquista aconteceu:
+ *
+ *   zona na 3ª, sem top ................. 3
+ *   zona na 1ª e top na 2ª .............. 2
+ *   zona na 5ª, depois falhou até o fim .. 5
+ *   nem zona nem top .................... 0
+ */
+export function attemptsOf(score) {
+  if (!score) return 0;
+  const zone = score.zone ? score.zone_attempts || 0 : 0;
+  const top = score.top ? score.top_attempts || 0 : 0;
+  return Math.max(zone, top, 0);
+}
+
+/**
+ * O atleta encarou este boulder?
+ * Vale tanto quem pontuou quanto quem tentou e não conseguiu nada —
+ * nesse segundo caso o árbitro marca "escalou", que grava `attempted`
+ * sem zona nem top.
+ */
+export function participated(score) {
+  if (!score) return false;
+  return Boolean(score.attempted || score.zone || score.top);
+}
+
 /** Nota de um único boulder a partir da linha de `scores`. */
 export function boulderScore(score) {
   if (!score) return 0;
@@ -41,12 +68,17 @@ export function boulderScore(score) {
 
 /**
  * Monta o resumo de um atleta em uma fase.
- * `boulders` precisa vir ordenado por número — o primeiro define o DNS.
  *
  * Estados possíveis:
- *   'ranked'  — fez ao menos uma tentativa no primeiro boulder, entra no ranking
- *   'pending' — ainda não escalou o primeiro boulder e a fase não terminou
- *   'dns'     — a fase terminou e ele nunca tentou o primeiro boulder
+ *   'ranked'  — encarou ao menos um boulder da fase, entra no ranking
+ *   'pending' — ainda não escalou nada e a fase não terminou
+ *   'dns'     — a fase terminou e ele não encarou nenhum boulder
+ *
+ * Nota sobre o DNS: a regra fala em "não fazer tentativas no primeiro
+ * boulder da rodada". Como as competições usam rodízio e cada atleta
+ * começa em um boulder diferente, o "primeiro boulder" é o primeiro da
+ * sequência dele — não o de número 1. Por isso a verificação é feita
+ * sobre a fase inteira: quem encarou qualquer boulder competiu.
  */
 function summarize(athlete, boulders, scoresByBoulder) {
   let total = 0;
@@ -55,6 +87,7 @@ function summarize(athlete, boulders, scoresByBoulder) {
   let topAttempts = 0;
   let zoneAttempts = 0;
   let totalAttempts = 0;
+  let started = false;
 
   const byBoulder = {};
 
@@ -66,7 +99,8 @@ function summarize(athlete, boulders, scoresByBoulder) {
     total += value;
 
     if (score) {
-      totalAttempts += score.attempts || 0;
+      if (participated(score)) started = true;
+      totalAttempts += attemptsOf(score);
       if (score.top) {
         tops += 1;
         topAttempts += score.top_attempts || 0;
@@ -77,11 +111,6 @@ function summarize(athlete, boulders, scoresByBoulder) {
       }
     }
   });
-
-  // O primeiro boulder da fase decide se o atleta iniciou a rodada.
-  const firstBoulder = boulders[0];
-  const firstScore = firstBoulder ? scoresByBoulder.get(firstBoulder.id) : null;
-  const started = Boolean(firstScore && (firstScore.attempts || 0) > 0);
 
   return {
     athlete,
@@ -109,7 +138,7 @@ function summarize(athlete, boulders, scoresByBoulder) {
  * Passe `null` quando a fase anterior tiver sido dividida em mais de um
  * grupo (nesse caso o critério (i) não se aplica).
  *
- * `roundFinished` controla o rótulo de quem não iniciou: durante a fase
+ * `roundFinished` controla o rótulo de quem não competiu: durante a fase
  * eles ficam como 'pending' (ainda vão escalar); com a fase encerrada
  * viram 'dns'.
  */
