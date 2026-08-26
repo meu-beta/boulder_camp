@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
+import { EVENT_TITLE } from '../lib/event';
 import PhaseTabs from '../components/PhaseTabs';
-import { boulderScore, formatScore } from '../lib/scoring';
+import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
 
 function StatCard({ label, value, sub }) {
   return (
@@ -26,7 +27,7 @@ export default function PublicInsights() {
 
   const started = ranking.filter((r) => r.status === 'ranked');
   const withTop = started.filter((r) => r.tops > 0).length;
-  const totalAttempts = scores.reduce((sum, s) => sum + (s.attempts || 0), 0);
+  const totalAttempts = scores.reduce((sum, s) => sum + attemptsOf(s), 0);
   const leader = started[0] ?? null;
 
   const boulderStats = boulders.map((boulder) => {
@@ -34,7 +35,7 @@ export default function PublicInsights() {
     const tops = rows.filter((s) => s.top).length;
     const zones = rows.filter((s) => s.zone && !s.top).length;
     const flashes = rows.filter((s) => s.top && s.top_attempts === 1).length;
-    const climbed = rows.filter((s) => (s.attempts || 0) > 0);
+    const climbed = rows.filter((s) => participated(s));
     const average =
       climbed.length > 0
         ? climbed.reduce((sum, s) => sum + boulderScore(s), 0) / climbed.length
@@ -43,11 +44,13 @@ export default function PublicInsights() {
   });
 
   return (
-    <div className="min-h-screen bg-panel py-10 px-4">
-      <div className="max-w-5xl mx-auto flex items-center justify-between mb-6 gap-4 flex-wrap">
+    <div className="min-h-screen bg-panel py-8 px-4">
+      <div className="max-w-5xl mx-auto flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <p className="text-gold uppercase tracking-widest text-sm">Boulder</p>
-          <h1 className="text-2xl font-bold">Insights do evento</h1>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-gold tracking-tight">
+            {EVENT_TITLE}
+          </h1>
+          <p className="text-white/60 text-sm mt-0.5">Insights do evento — Boulder</p>
         </div>
         <nav className="flex gap-4 text-sm text-white/70">
           <Link to="/comp" className="hover:text-white">
@@ -77,7 +80,11 @@ export default function PublicInsights() {
       ) : (
         <div className="max-w-5xl mx-auto space-y-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatCard label="Em disputa" value={started.length} sub={`de ${ranking.length} inscritos`} />
+            <StatCard
+              label="Em disputa"
+              value={started.length}
+              sub={`de ${ranking.length} inscritos`}
+            />
             <StatCard label="Com Top" value={withTop} />
             <StatCard label="Tentativas" value={totalAttempts} sub="somadas na fase" />
             <StatCard
@@ -103,7 +110,9 @@ export default function PublicInsights() {
                   </p>
                   <p className="text-white/40 text-xs">média de quem escalou</p>
                   <div className="mt-3 space-y-0.5 text-xs text-white/60">
-                    <p>{stat.tops} top(s), {stat.flashes} flash(es)</p>
+                    <p>
+                      {stat.tops} top(s), {stat.flashes} flash(es)
+                    </p>
                     <p>{stat.zones} só zona</p>
                     <p className="text-white/30">{stat.climbed} escalaram</p>
                   </div>
