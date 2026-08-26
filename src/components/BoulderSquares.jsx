@@ -1,10 +1,10 @@
-import { boulderScore } from '../lib/scoring';
+import { boulderScore, participated } from '../lib/scoring';
 
 // Um quadradinho por boulder da fase:
 //   dourado cheio  = TOP
 //   dourado vazado = ZONA
-//   cinza           = tentou e não pontuou
-//   contorno fraco  = ainda não escalou
+//   cinza          = escalou e não pontuou
+//   contorno fraco = ainda não encarou
 export default function BoulderSquares({ boulderIds, byBoulder }) {
   return (
     <div className="flex gap-1">
@@ -13,7 +13,7 @@ export default function BoulderSquares({ boulderIds, byBoulder }) {
         const score = cell?.score ?? null;
 
         let className = 'square square-empty';
-        let title = 'Ainda não escalou';
+        let title = 'Ainda não encarou';
 
         if (score) {
           const value = boulderScore(score);
@@ -23,9 +23,9 @@ export default function BoulderSquares({ boulderIds, byBoulder }) {
           } else if (score.zone) {
             className = 'square square-zone';
             title = `ZONA na ${score.zone_attempts}ª tentativa — ${value.toFixed(1)} pts`;
-          } else if ((score.attempts || 0) > 0) {
+          } else if (participated(score)) {
             className = 'square square-tried';
-            title = `${score.attempts} tentativa(s), sem zona — 0,0 pts`;
+            title = 'Escalou sem conquistar zona — 0,0 pts';
           }
         }
 

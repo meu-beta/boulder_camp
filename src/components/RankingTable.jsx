@@ -26,7 +26,7 @@ function StatusBadge({ status }) {
     );
   }
   return (
-    <span className="text-xs text-white/25" title="Ainda não escalou o primeiro boulder">
+    <span className="text-xs text-white/25" title="Ainda não escalou nenhum boulder">
       —
     </span>
   );
@@ -45,10 +45,9 @@ export default function RankingTable({ ranking, title = 'RANKING', advanceCount 
               <th className="py-2 px-3 w-12">#</th>
               <th className="py-2 px-3">Atleta</th>
               <th className="py-2 px-3">Boulders</th>
-              <th className="py-2 px-3 text-right w-24">Pontos</th>
+              <th className="py-2 px-3 text-right w-28">Pontos</th>
               <th className="py-2 px-3 text-center w-16">Top</th>
               <th className="py-2 px-3 text-center w-16">Zona</th>
-              <th className="py-2 px-3 text-center w-20">Tent. Top</th>
             </tr>
           </thead>
           <tbody>
@@ -83,15 +82,12 @@ export default function RankingTable({ ranking, title = 'RANKING', advanceCount 
                   </td>
                   <td className="py-2 px-3 text-center tabular-nums">{row.tops}</td>
                   <td className="py-2 px-3 text-center tabular-nums">{row.zones}</td>
-                  <td className="py-2 px-3 text-center tabular-nums text-white/60">
-                    {row.topAttempts || '—'}
-                  </td>
                 </tr>
               );
             })}
             {ranking.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 px-3 text-center text-white/50">
+                <td colSpan={6} className="py-6 px-3 text-center text-white/50">
                   Nenhum atleta inscrito nesta fase ainda.
                 </td>
               </tr>
