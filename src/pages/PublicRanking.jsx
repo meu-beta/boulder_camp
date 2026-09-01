@@ -61,9 +61,20 @@ export default function PublicRanking() {
     };
   }, [isFullscreen, measure, ranking.length, roundId, loading]);
 
-  // ---- Rolamento automático ----
+  // ---- Rolamento automático, perpétuo ----
   // Ciclo: 15s parado no topo → desce devagar até o último colocado →
-  // 3s parado no fim → corte seco de volta ao topo → recomeça.
+  // 3s parado no fim → corte seco de volta ao topo → recomeça, sem parar.
+  //
+  // É um laço ÚNICO de animação e a fase sai de `elapsed % cicloTotal`.
+  // A versão anterior encadeava setTimeout a cada etapa: bastava um elo da
+  // corrente se perder para o movimento morrer depois de uma volta. Aqui não
+  // há corrente — enquanto o quadro seguinte for pedido, o ciclo se repete.
+  //
+  // O tempo é acumulado quadro a quadro, com o delta limitado a 100ms. Assim,
+  // se o navegador congelar os quadros (aba oculta, protetor de tela, monitor
+  // que dormiu), ao voltar o ranking continua de onde parou em vez de dar um
+  // salto proporcional ao tempo que ficou fora.
+  //
   // Só roda se a tabela for mais alta que a tela; se couber inteira, fica parada.
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -75,38 +86,35 @@ export default function PublicRanking() {
       return undefined;
     }
 
-    let frame = null;
-    let timer = null;
-    let cancelled = false;
     const travelMs = (distance / SCROLL_SPEED) * 1000;
+    const cycleMs = TOP_HOLD_MS + travelMs + BOTTOM_HOLD_MS;
 
-    const descend = () => {
-      const startedAt = performance.now();
-      const step = (now) => {
-        if (cancelled) return;
-        const progress = Math.min(1, (now - startedAt) / travelMs);
-        viewport.scrollTop = distance * progress;
-        if (progress < 1) {
-          frame = requestAnimationFrame(step);
-        } else {
-          timer = setTimeout(cycle, BOTTOM_HOLD_MS);
-        }
-      };
-      frame = requestAnimationFrame(step);
+    let frame = null;
+    let cancelled = false;
+    let elapsed = 0;
+    let last = performance.now();
+
+    const positionAt = (t) => {
+      if (t < TOP_HOLD_MS) return 0;
+      if (t < TOP_HOLD_MS + travelMs) return (distance * (t - TOP_HOLD_MS)) / travelMs;
+      return distance;
     };
 
-    function cycle() {
+    const loop = (now) => {
       if (cancelled) return;
-      viewport.scrollTop = 0; // corte seco
-      timer = setTimeout(descend, TOP_HOLD_MS);
-    }
+      const delta = Math.min(now - last, 100);
+      last = now;
+      elapsed = (elapsed + delta) % cycleMs;
+      viewport.scrollTop = positionAt(elapsed);
+      frame = requestAnimationFrame(loop);
+    };
 
-    cycle();
+    viewport.scrollTop = 0;
+    frame = requestAnimationFrame(loop);
 
     return () => {
       cancelled = true;
       if (frame) cancelAnimationFrame(frame);
-      if (timer) clearTimeout(timer);
       viewport.scrollTop = 0;
     };
   }, [isFullscreen, boardHeight, roundId, ranking.length]);
