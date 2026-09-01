@@ -29,6 +29,29 @@ export default function PublicRanking() {
 
   const { round, ranking } = getRound(roundId);
 
+  // ---- Congelamento entre voltas ----
+  // O ranking chega ao vivo pelo Realtime: assim que um árbitro salva, as
+  // linhas se reordenam. No telão, se isso acontecer no meio da descida, os
+  // atletas trocam de lugar debaixo do olho de quem está lendo.
+  //
+  // Então em tela cheia a tabela mostra uma FOTO do ranking, e a foto só é
+  // trocada no corte seco — o instante em que a rolagem volta ao topo e
+  // ninguém está acompanhando uma linha específica. A pontuação nova aparece
+  // junto com o recomeço da volta.
+  //
+  // `liveRef` guarda sempre o dado mais recente, sem provocar renderização;
+  // é dele que o corte tira a foto nova.
+  const liveRef = useRef(ranking);
+  liveRef.current = ranking;
+
+  const [frozen, setFrozen] = useState(null);
+  const shown = isFullscreen && frozen ? frozen : ranking;
+
+  // Ao entrar em tela cheia congela na hora; ao sair, volta a ser ao vivo.
+  useEffect(() => {
+    setFrozen(isFullscreen ? liveRef.current : null);
+  }, [isFullscreen]);
+
   // ---- Escala: em tela cheia a tabela é ampliada até preencher a LARGURA ----
   // Antes ela era limitada pela altura e sobrava tela dos dois lados. Agora
   // manda a largura; se ficar mais alta que o monitor, o rolamento resolve.
@@ -59,7 +82,7 @@ export default function PublicRanking() {
       clearTimeout(settle);
       window.removeEventListener('resize', measure);
     };
-  }, [isFullscreen, measure, ranking.length, roundId, loading]);
+  }, [isFullscreen, measure, shown.length, roundId, loading]);
 
   // ---- Rolamento automático, perpétuo ----
   // Ciclo: 15s parado no topo → desce devagar até o último colocado →
@@ -104,7 +127,14 @@ export default function PublicRanking() {
       if (cancelled) return;
       const delta = Math.min(now - last, 100);
       last = now;
-      elapsed = (elapsed + delta) % cycleMs;
+
+      const next = elapsed + delta;
+      if (next >= cycleMs) {
+        // Virou a volta: é aqui, e só aqui, que a pontuação nova entra.
+        setFrozen(liveRef.current);
+      }
+      elapsed = next % cycleMs;
+
       viewport.scrollTop = positionAt(elapsed);
       frame = requestAnimationFrame(loop);
     };
@@ -117,7 +147,7 @@ export default function PublicRanking() {
       if (frame) cancelAnimationFrame(frame);
       viewport.scrollTop = 0;
     };
-  }, [isFullscreen, boardHeight, roundId, ranking.length]);
+  }, [isFullscreen, boardHeight, roundId, shown.length]);
 
   const board = (
     <div
@@ -131,7 +161,7 @@ export default function PublicRanking() {
         </h1>
       )}
       <RankingTable
-        ranking={ranking}
+        ranking={shown}
         title={round ? round.name.toUpperCase() : 'RANKING'}
         advanceCount={round?.advance_count ?? null}
         showStates={category?.show_states ?? false}
