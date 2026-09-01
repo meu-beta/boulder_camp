@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
 import { EVENT_TITLE } from '../lib/event';
 import RankingTable from '../components/RankingTable';
+import LeadRankingTable from '../components/LeadRankingTable';
+import { disciplineOf } from '../lib/disciplines';
 import PhaseTabs from '../components/PhaseTabs';
 import FullscreenButton from '../components/FullscreenButton';
 import { useFullscreen } from '../lib/useFullscreen';
@@ -13,8 +15,12 @@ const BOTTOM_HOLD_MS = 3000; // respiro no último colocado antes do corte
 const SCROLL_SPEED = 38; // pixels por segundo — leitura confortável de longe
 const BOARD_WIDTH = 1024; // largura de autoria da tabela (max-w-5xl), antes da escala
 
-export default function PublicRanking() {
-  const { category, rounds, activeRound, getRound, loading } = useEvent('Boulder');
+// `categoryName` escolhe a modalidade. O padrão é Boulder para que /comp
+// continue exatamente como está — é o endereço que o telão já usa.
+export default function PublicRanking({ categoryName = 'Boulder' }) {
+  const { category, rounds, activeRound, getRound, loading } = useEvent(categoryName);
+  const discipline = disciplineOf(category);
+  const Table = discipline.key === 'lead' ? LeadRankingTable : RankingTable;
   const [roundId, setRoundId] = useState(null);
   const { isFullscreen, toggle, supported } = useFullscreen();
 
@@ -160,7 +166,7 @@ export default function PublicRanking() {
           {EVENT_TITLE}
         </h1>
       )}
-      <RankingTable
+      <Table
         ranking={shown}
         title={round ? round.name.toUpperCase() : 'RANKING'}
         advanceCount={round?.advance_count ?? null}
@@ -191,13 +197,16 @@ export default function PublicRanking() {
           <h1 className="text-xl sm:text-2xl font-extrabold text-gold tracking-tight">
             {EVENT_TITLE}
           </h1>
-          <p className="text-white/60 text-sm mt-0.5">Ranking ao vivo — Boulder</p>
+          <p className="text-white/60 text-sm mt-0.5">Ranking ao vivo — {discipline.label}</p>
         </div>
 
         <div className="flex items-center gap-4 ml-auto">
           <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/70">
             <Link to="/comp" className="hover:text-white">
-              Ranking
+              Boulder
+            </Link>
+            <Link to="/comp/lead" className="hover:text-white">
+              Guiada
             </Link>
             <Link to="/comp/insights" className="hover:text-white">
               Insights

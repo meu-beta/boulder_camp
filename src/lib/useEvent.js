@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { computeRanking, ranksFrom } from './scoring';
+import { disciplineOf } from './disciplines';
 
 // Carrega o evento inteiro de uma vez (são poucas dezenas de linhas) e
 // mantém tudo sincronizado via Supabase Realtime. Calcular o ranking no
@@ -87,31 +87,39 @@ export function useEvent(categoryName = 'Boulder') {
   }, [load]);
 
   // Ranking de todas as fases, em ordem, encadeando o desempate.
+  // Qual cálculo roda depende da modalidade da categoria — ver disciplines.js.
   const rankingByRound = useMemo(() => {
     const result = new Map();
     const athleteById = new Map(data.athletes.map((a) => [a.id, a]));
+    const discipline = disciplineOf(data.category);
+
+    const ordenadas = [...data.rounds].sort((a, b) => a.sequence - b.sequence);
+    const ultima = ordenadas.length ? ordenadas[ordenadas.length - 1].id : null;
+
     let previousRanks = null;
+    let previousTwoGroups = false;
 
-    [...data.rounds]
-      .sort((a, b) => a.sequence - b.sequence)
-      .forEach((round) => {
-        const roundBoulders = data.boulders.filter((b) => b.round_id === round.id);
-        const roundAthletes = data.entries
-          .filter((e) => e.round_id === round.id)
-          .map((e) => athleteById.get(e.athlete_id))
-          .filter(Boolean);
+    ordenadas.forEach((round) => {
+      const roundClimbs = data.boulders.filter((b) => b.round_id === round.id);
+      const roundAthletes = data.entries
+        .filter((e) => e.round_id === round.id)
+        .map((e) => athleteById.get(e.athlete_id))
+        .filter(Boolean);
 
-        const ranking = computeRanking({
-          athletes: roundAthletes,
-          boulders: roundBoulders,
-          scores: data.scores,
-          previousRanks,
-          roundFinished: round.is_finished,
-        });
-
-        result.set(round.id, ranking);
-        previousRanks = ranksFrom(ranking);
+      const ranking = discipline.computeRanking({
+        athletes: roundAthletes,
+        climbs: roundClimbs,
+        scores: data.scores,
+        previousRanks,
+        round,
+        isFinal: round.id === ultima,
+        previousTwoGroups,
       });
+
+      result.set(round.id, ranking);
+      previousRanks = discipline.ranksFrom(ranking);
+      previousTwoGroups = Boolean(round.two_groups);
+    });
 
     return result;
   }, [data]);

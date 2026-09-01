@@ -22,6 +22,9 @@ export default function App() {
 
       {/* MEU BETA COMP — PÚBLICO — sem login */}
       <Route path="/comp" element={<PublicRanking />} />
+      {/* Endereco proprio por modalidade: cada telao aponta para o seu. */}
+      <Route path="/comp/boulder" element={<PublicRanking categoryName="Boulder" />} />
+      <Route path="/comp/lead" element={<PublicRanking categoryName="Lead" />} />
       <Route path="/comp/insights" element={<PublicInsights />} />
 
       {/* STAFF — arbitragem (pontuação) */}
