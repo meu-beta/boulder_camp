@@ -6,7 +6,7 @@ import RankingTable from '../components/RankingTable';
 import PhaseTabs from '../components/PhaseTabs';
 
 export default function PublicRanking() {
-  const { rounds, activeRound, getRound, loading } = useEvent('Boulder');
+  const { category, rounds, activeRound, getRound, loading } = useEvent('Boulder');
   const [roundId, setRoundId] = useState(null);
 
   useEffect(() => {
@@ -54,6 +54,7 @@ export default function PublicRanking() {
           ranking={ranking}
           title={round ? round.name.toUpperCase() : 'RANKING'}
           advanceCount={round?.advance_count ?? null}
+          showStates={category?.show_states ?? false}
         />
       )}
 

@@ -1,5 +1,7 @@
 import BoulderSquares from './BoulderSquares';
+import StateFlag from './StateFlag';
 import { formatScore } from '../lib/scoring';
+import { STATE_FLAGS } from '../lib/states';
 
 const FLAGS = {
   BRA: '🇧🇷',
@@ -32,7 +34,21 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function RankingTable({ ranking, title = 'RANKING', advanceCount = null }) {
+// Identificacao de origem do atleta na linha do ranking.
+// Com o switch de estados ligado, um atleta com UF mostra a bandeira do
+// estado; sem UF (ou com o switch desligado) cai para a bandeira do pais.
+function Origin({ athlete, showStates }) {
+  const uf = String(athlete.state_code || '').toUpperCase();
+  if (showStates && STATE_FLAGS[uf]) return <StateFlag uf={uf} className="mr-2" />;
+  return <span className="mr-2">{FLAGS[athlete.country_code] ?? '\u{1F3F3}\uFE0F'}</span>;
+}
+
+export default function RankingTable({
+  ranking,
+  title = 'RANKING',
+  advanceCount = null,
+  showStates = false,
+}) {
   return (
     <div className="w-full max-w-5xl mx-auto">
       {title ? (
@@ -43,7 +59,7 @@ export default function RankingTable({ ranking, title = 'RANKING', advanceCount 
       {/* No celular a tabela nao cabe inteira: em vez de cortar (overflow-hidden),
           ela rola na horizontal. */}
       <div className="rounded-lg border border-white/10 overflow-x-auto overscroll-x-contain">
-        <table className="w-full min-w-[480px] text-left">
+        <table className="w-full min-w-[520px] text-left">
           <thead>
             <tr className="bg-panel2 text-xs uppercase text-white/60">
               <th className="py-2.5 px-2 sm:px-3 w-12">#</th>
@@ -72,7 +88,7 @@ export default function RankingTable({ ranking, title = 'RANKING', advanceCount 
                     {row.rank ?? <StatusBadge status={row.status} />}
                   </td>
                   <td className="py-2.5 px-2 sm:px-3 font-semibold">
-                    <span className="mr-2">{FLAGS[row.athlete.country_code] ?? '🏳️'}</span>
+                    <Origin athlete={row.athlete} showStates={showStates} />
                     {row.athlete.bib_number ? (
                       <span className="text-white/40 mr-1">#{row.athlete.bib_number}</span>
                     ) : null}

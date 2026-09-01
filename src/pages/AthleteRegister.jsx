@@ -4,6 +4,8 @@ import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { useEvent } from '../lib/useEvent';
 import PhaseTabs from '../components/PhaseTabs';
+import StateFlag from '../components/StateFlag';
+import { STATES, isValidUf } from '../lib/states';
 
 // Cadastro de atletas e inscrição deles em cada fase.
 // Um atleta só aparece no ranking e no painel do árbitro se estiver
@@ -17,7 +19,14 @@ export default function AthleteRegister() {
     useEvent('Boulder');
 
   const [roundId, setRoundId] = useState(null);
-  const [form, setForm] = useState({ name: '', bib_number: '', country_code: 'BRA' });
+  // O estado costuma se repetir entre atletas do mesmo clube, entao ele
+  // permanece preenchido depois de cadastrar.
+  const [form, setForm] = useState({
+    name: '',
+    bib_number: '',
+    country_code: 'BRA',
+    state_code: 'SP',
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -42,6 +51,7 @@ export default function AthleteRegister() {
         name: form.name.trim(),
         bib_number: form.bib_number ? Number(form.bib_number) : null,
         country_code: form.country_code.toUpperCase().slice(0, 3) || null,
+        state_code: isValidUf(form.state_code) ? form.state_code.toUpperCase() : null,
         category_id: category.id,
       })
       .select()
@@ -54,7 +64,12 @@ export default function AthleteRegister() {
         .insert({ round_id: round.id, athlete_id: created.id });
     }
 
-    setForm({ name: '', bib_number: '', country_code: form.country_code });
+    setForm({
+      name: '',
+      bib_number: '',
+      country_code: form.country_code,
+      state_code: form.state_code,
+    });
     setSaving(false);
     refresh();
   };
@@ -116,7 +131,7 @@ export default function AthleteRegister() {
 
         <form
           onSubmit={handleSubmit}
-          className="bg-panel2 border border-white/10 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-4 gap-3 mb-8"
+          className="bg-panel2 border border-white/10 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-6 gap-3 mb-8"
         >
           <input
             required
@@ -132,6 +147,19 @@ export default function AthleteRegister() {
             onChange={(e) => setForm((f) => ({ ...f, bib_number: e.target.value }))}
             className="px-3 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none"
           />
+          <select
+            value={form.state_code}
+            onChange={(e) => setForm((f) => ({ ...f, state_code: e.target.value }))}
+            title="Estado do atleta"
+            className="px-3 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm"
+          >
+            <option value="">Estado</option>
+            {STATES.map((s) => (
+              <option key={s.uf} value={s.uf}>
+                {s.uf} - {s.name}
+              </option>
+            ))}
+          </select>
           <input
             placeholder="País"
             maxLength={3}
@@ -142,7 +170,7 @@ export default function AthleteRegister() {
           <button
             type="submit"
             disabled={saving || !round}
-            className="sm:col-span-4 bg-gold text-panel font-bold py-2 rounded hover:opacity-90 disabled:opacity-40"
+            className="sm:col-span-6 bg-gold text-panel font-bold py-2 rounded hover:opacity-90 disabled:opacity-40"
           >
             {saving ? 'Salvando...' : `Adicionar atleta${round ? ` e inscrever em ${round.name}` : ''}`}
           </button>
@@ -171,7 +199,9 @@ export default function AthleteRegister() {
                   <span className="flex-1 truncate">
                     {a.bib_number ? <span className="text-white/40 mr-1">#{a.bib_number}</span> : null}
                     {a.name}
-                    {a.country_code ? (
+                    {a.state_code ? (
+                      <StateFlag uf={a.state_code} className="ml-2" />
+                    ) : a.country_code ? (
                       <span className="text-white/40 ml-2 text-sm">{a.country_code}</span>
                     ) : null}
                   </span>

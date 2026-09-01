@@ -22,7 +22,8 @@ create table if not exists profiles (
 -- ---------- CATEGORIES ----------
 create table if not exists categories (
   id serial primary key,
-  name text not null unique
+  name text not null unique,
+  show_states boolean not null default true
 );
 insert into categories (name) values ('Boulder') on conflict do nothing;
 
@@ -45,6 +46,7 @@ create table if not exists athletes (
   bib_number int,
   name text not null,
   country_code text, -- ISO-3166 alpha-2 or alpha-3, e.g. 'FRA', 'BEL'
+  state_code text, -- UF brasileira, e.g. 'SP', 'RJ'
   category_id int not null references categories (id) on delete restrict,
   created_at timestamptz not null default now()
 );
@@ -157,6 +159,13 @@ create policy "athlete_control write athletes" on athletes for all using (
 );
 
 create policy "athlete_control write queue" on queue_entries for all using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'athlete_control')
+) with check (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'athlete_control')
+);
+
+-- ATHLETE_CONTROL pode ligar/desligar a exibicao de estados no ranking
+create policy "athlete_control update categories" on categories for update using (
   exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'athlete_control')
 ) with check (
   exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'athlete_control')

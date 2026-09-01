@@ -153,7 +153,20 @@ function RoundCard({ round, nextRound, ranking, athletesInRound, onPatch, onProm
 export default function RoundsAdmin() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const { rounds, entries, rankingByRound, loading, refresh } = useEvent('Boulder');
+  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent('Boulder');
+  const [savingStates, setSavingStates] = useState(false);
+
+  const showStates = category?.show_states ?? false;
+
+  // Liga/desliga a exibicao de estados em TODAS as telas de ranking de uma vez,
+  // inclusive no telao - por isso fica gravado no banco, e nao no navegador.
+  const toggleStates = async () => {
+    if (!category) return;
+    setSavingStates(true);
+    await supabase.from('categories').update({ show_states: !showStates }).eq('id', category.id);
+    await refresh();
+    setSavingStates(false);
+  };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -261,6 +274,32 @@ export default function RoundsAdmin() {
             {message}
           </p>
         )}
+
+        <div className="mb-6 bg-panel2 border border-white/10 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-semibold">Mostrar estados no ranking</p>
+            <p className="text-white/40 text-xs mt-0.5">
+              Exibe a bandeira e a sigla do estado no lugar da bandeira do país. Vale para o
+              telão e para todas as telas de ranking.
+            </p>
+          </div>
+          <button
+            onClick={toggleStates}
+            disabled={savingStates || !category}
+            role="switch"
+            aria-checked={showStates}
+            aria-label="Mostrar estados no ranking"
+            className={`relative w-14 h-8 shrink-0 rounded-full transition disabled:opacity-40 ${
+              showStates ? 'bg-gold' : 'bg-white/15'
+            }`}
+          >
+            <span
+              className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow transition-all ${
+                showStates ? 'left-7' : 'left-1'
+              }`}
+            />
+          </button>
+        </div>
 
         {loading ? (
           <p className="text-center text-white/60 py-12">Carregando...</p>
