@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { beepCountdown, beepEnd, beepOneMinute, unlockAudio } from '../lib/beep';
+import { useFullscreen } from '../lib/useFullscreen';
+import FullscreenButton from '../components/FullscreenButton';
 
 // Cronômetro único, pensado para ser projetado.
 // O estado fica no Supabase (tabela timer_state, linha id = 1), então
@@ -28,6 +30,7 @@ export default function AthleteTimer() {
   const [remaining, setRemaining] = useState(0);
   const [customMinutes, setCustomMinutes] = useState('');
   const lastBeepedSecond = useRef(null);
+  const { isFullscreen, toggle, supported } = useFullscreen();
 
   // ---- carrega e escuta o estado compartilhado ----
   useEffect(() => {
@@ -137,10 +140,15 @@ export default function AthleteTimer() {
 
   return (
     <div className="min-h-screen bg-panel flex flex-col">
-      {/* Cabeçalho discreto — some da vista no projetor */}
+      {/* Cabeçalho discreto — some por completo em tela cheia */}
       <div className="flex items-center justify-between px-6 py-3 text-sm text-white/40">
-        <span className="uppercase tracking-widest text-xs">Cronômetro</span>
+        <span className={`uppercase tracking-widest text-xs ${isFullscreen ? 'invisible' : ''}`}>
+          Cronômetro
+        </span>
         <div className="flex gap-4 items-center">
+          {supported && <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />}
+          {isFullscreen ? null : (
+            <>
           <Link to="/comp/athlete-control/queue" className="hover:text-white">
             Fila
           </Link>
@@ -153,6 +161,8 @@ export default function AthleteTimer() {
           <button onClick={handleLogout} className="hover:text-white">
             Sair
           </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -162,14 +172,18 @@ export default function AthleteTimer() {
           className={`timer-digits font-extrabold tabular-nums transition-colors ${digitColor} ${
             critical ? 'animate-pulse' : ''
           }`}
-          style={{ fontSize: 'min(38vw, 60vh)' }}
+          style={{ fontSize: isFullscreen ? 'min(44vw, 78vh)' : 'min(38vw, 60vh)' }}
         >
           {formatClock(remaining)}
         </div>
       </div>
 
       {/* Controles */}
-      <div className="px-6 pb-10 flex flex-col items-center gap-5">
+      <div
+        className={`px-6 pb-10 flex flex-col items-center gap-5 transition-opacity duration-300 ${
+          isFullscreen ? 'opacity-0 hover:opacity-100 focus-within:opacity-100' : ''
+        }`}
+      >
         <div className="flex flex-wrap gap-3 justify-center">
           {running ? (
             <button
@@ -233,7 +247,7 @@ export default function AthleteTimer() {
           </button>
         </div>
 
-        <p className="text-white/25 text-xs text-center max-w-md">
+        <p className={`text-white/25 text-xs text-center max-w-md ${isFullscreen ? 'hidden' : ''}`}>
           Bip duplo ao faltar 1 minuto, bip a cada um dos 5 segundos finais e bip longo no zero.
           Clique em qualquer botão uma vez para o navegador liberar o som.
         </p>
