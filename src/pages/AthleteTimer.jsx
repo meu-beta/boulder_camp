@@ -141,7 +141,7 @@ export default function AthleteTimer() {
   return (
     <div className="min-h-screen bg-panel flex flex-col">
       {/* Cabeçalho discreto — some por completo em tela cheia */}
-      <div className="flex items-center justify-between px-6 py-3 text-sm text-white/40">
+      <div className="relative z-20 flex items-center justify-between px-6 py-3 text-sm text-white/40">
         <span className={`uppercase tracking-widest text-xs ${isFullscreen ? 'invisible' : ''}`}>
           Cronômetro
         </span>
@@ -166,8 +166,11 @@ export default function AthleteTimer() {
         </div>
       </div>
 
-      {/* O relógio, ocupando tudo */}
-      <div className="flex-1 flex items-center justify-center px-4">
+      {/* O relógio, ocupando tudo.
+          Com a fonte gigante os dígitos transbordam da própria caixa e passavam
+          por cima do cabeçalho, roubando o clique do botão de tela cheia.
+          pointer-events-none devolve o clique para quem está embaixo. */}
+      <div className="relative z-0 flex-1 flex items-center justify-center px-4 pointer-events-none">
         <div
           className={`timer-digits font-extrabold tabular-nums transition-colors ${digitColor} ${
             critical ? 'animate-pulse' : ''
