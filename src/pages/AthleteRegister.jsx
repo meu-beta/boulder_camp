@@ -207,7 +207,7 @@ export default function AthleteRegister() {
                   </span>
                   <button
                     onClick={() => handleDelete(a.id)}
-                    className="text-red-400/70 hover:text-red-300 text-sm"
+                    className="text-alert/70 hover:text-alert text-sm"
                   >
                     Remover
                   </button>

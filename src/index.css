@@ -4,22 +4,29 @@
 
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
+  background-color: #000;
 }
 
+/* Quadradinhos de boulder: a cor conta o resultado sem precisar de texto.
+   amarelo cheio = TOP · azul pela metade = ZONA · cinza = escalou sem pontuar */
 .square {
-  @apply inline-block w-4 h-6 sm:w-5 sm:h-7 border border-gold/60 rounded-[2px];
+  @apply inline-block w-4 h-6 sm:w-5 sm:h-7 border rounded-[2px];
+  border-color: rgb(255 255 255 / 0.18);
 }
 .square-top {
-  @apply bg-gold border-gold;
+  @apply bg-gold;
+  border-color: #f8b600;
 }
 .square-zone {
-  background: linear-gradient(to top, #f2c14e 50%, transparent 50%);
+  background: linear-gradient(to top, #13bfff 50%, transparent 50%);
+  border-color: rgb(19 191 255 / 0.7);
 }
 .square-tried {
   @apply bg-white/10 border-white/20;
 }
 .square-empty {
-  @apply bg-transparent border-white/15;
+  @apply bg-transparent;
+  border-color: rgb(255 255 255 / 0.15);
 }
 
 /* Dígitos do cronômetro de projeção: largura fixa para não "dançar". */

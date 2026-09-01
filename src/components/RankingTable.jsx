@@ -22,7 +22,7 @@ const FLAGS = {
 function StatusBadge({ status }) {
   if (status === 'dns') {
     return (
-      <span className="text-xs font-bold text-red-400/80 tracking-wide" title="Did Not Start">
+      <span className="text-xs font-bold text-alert tracking-wide" title="Did Not Start">
         DNS
       </span>
     );
@@ -61,13 +61,13 @@ export default function RankingTable({
       <div className="rounded-lg border border-white/10 overflow-x-auto overscroll-x-contain">
         <table className="w-full min-w-[520px] text-left">
           <thead>
-            <tr className="bg-panel2 text-xs uppercase text-white/60">
+            <tr className="bg-panel3 text-xs uppercase text-white/60">
               <th className="py-2.5 px-2 sm:px-3 w-12">#</th>
               <th className="py-2.5 px-2 sm:px-3">Atleta</th>
               <th className="py-2.5 px-2 sm:px-3">Boulders</th>
               <th className="py-2.5 px-2 sm:px-3 text-right w-28">Pontos</th>
-              <th className="py-2.5 px-2 sm:px-3 text-center w-16">Top</th>
-              <th className="py-2.5 px-2 sm:px-3 text-center w-16">Zona</th>
+              <th className="py-2.5 px-2 sm:px-3 text-center w-16 text-gold/80">Top</th>
+              <th className="py-2.5 px-2 sm:px-3 text-center w-16 text-zone/80">Zona</th>
             </tr>
           </thead>
           <tbody>
@@ -79,8 +79,8 @@ export default function RankingTable({
                 <tr
                   key={row.athlete.id}
                   className={`border-t border-white/5 ${
-                    index % 2 === 0 ? 'bg-white/5' : 'bg-transparent'
-                  } ${advancing ? 'shadow-[inset_3px_0_0_0_#f2c14e]' : ''} ${
+                    index % 2 === 0 ? 'bg-white/[0.035]' : 'bg-transparent'
+                  } ${advancing ? 'shadow-[inset_3px_0_0_0_#48ec57]' : ''} ${
                     row.status !== 'ranked' ? 'opacity-50' : ''
                   }`}
                 >
@@ -100,8 +100,8 @@ export default function RankingTable({
                   <td className="py-2.5 px-2 sm:px-3 text-right font-bold text-gold text-lg tabular-nums">
                     {formatScore(row.total)}
                   </td>
-                  <td className="py-2.5 px-2 sm:px-3 text-center tabular-nums">{row.tops}</td>
-                  <td className="py-2.5 px-2 sm:px-3 text-center tabular-nums">{row.zones}</td>
+                  <td className="py-2.5 px-2 sm:px-3 text-center tabular-nums text-gold/90">{row.tops}</td>
+                  <td className="py-2.5 px-2 sm:px-3 text-center tabular-nums text-zone/90">{row.zones}</td>
                 </tr>
               );
             })}
@@ -117,7 +117,7 @@ export default function RankingTable({
       </div>
       {advanceCount ? (
         <p className="text-white/40 text-xs mt-3">
-          A faixa dourada marca os {advanceCount} primeiros, que avançam para a próxima fase.
+          A faixa verde marca os {advanceCount} primeiros, que avançam para a próxima fase.
         </p>
       ) : null}
     </div>

@@ -56,7 +56,7 @@ export default function StaffLogin({ role = 'staff', title = 'STAFF — Arbitrag
           className="w-full mb-4 px-3 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none"
         />
 
-        {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+        {error && <p className="text-alert text-sm mb-4">{error}</p>}
 
         <button
           type="submit"

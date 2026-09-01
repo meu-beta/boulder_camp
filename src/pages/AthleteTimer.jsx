@@ -128,9 +128,9 @@ export default function AthleteTimer() {
   const warning = remaining <= 60 && remaining > 5;
 
   const digitColor = finished
-    ? 'text-red-500'
+    ? 'text-alert'
     : critical
-    ? 'text-red-400'
+    ? 'text-alert/80'
     : warning
     ? 'text-gold'
     : 'text-white';

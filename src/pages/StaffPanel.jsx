@@ -18,7 +18,12 @@ import PhaseTabs from '../components/PhaseTabs';
 // Alvos de toque grandes: o arbitro lanca pontuacao em pe, no celular.
 // O checkbox padrao (~13px) e pequeno demais; 24px fica confortavel.
 // text-base no input evita o zoom automatico do Safari no iPhone.
-const CHECKBOX = 'w-6 h-6 rounded accent-gold shrink-0 cursor-pointer';
+// Zona em azul e Top em amarelo: as mesmas cores dos quadradinhos do
+// ranking, para o arbitro associar na hora o que esta marcando.
+const CHECKBOX = 'w-6 h-6 rounded shrink-0 cursor-pointer';
+const CHECKBOX_ZONE = CHECKBOX + ' accent-zone';
+const CHECKBOX_TOP = CHECKBOX + ' accent-gold';
+const CHECKBOX_TRIED = CHECKBOX + ' accent-white';
 const NUMBER_INPUT =
   'w-16 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
 
@@ -131,9 +136,9 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
               type="checkbox"
               checked={draft.zone}
               onChange={(e) => setZone(e.target.checked)}
-            className={CHECKBOX}
+            className={CHECKBOX_ZONE}
             />
-            <span className="font-semibold">Zona</span>
+            <span className="font-semibold text-zone">Zona</span>
             <span className="text-white/40 text-xs">na tentativa</span>
             <input
               type="number"
@@ -151,9 +156,9 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
               type="checkbox"
               checked={draft.top}
               onChange={(e) => setTop(e.target.checked)}
-            className={CHECKBOX}
+            className={CHECKBOX_TOP}
             />
-            <span className="font-semibold">Top</span>
+            <span className="font-semibold text-gold">Top</span>
             <span className="text-white/40 text-xs">na tentativa</span>
             <input
               type="number"
@@ -175,7 +180,7 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
               checked={draft.attempted}
               disabled={draft.zone || draft.top}
               onChange={(e) => update({ attempted: e.target.checked })}
-            className={CHECKBOX}
+            className={CHECKBOX_TRIED}
             />
             <span className={touched ? 'text-white/70' : 'text-white/40'}>Escalou</span>
           </label>
