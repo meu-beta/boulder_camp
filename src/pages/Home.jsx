@@ -18,7 +18,7 @@ export default function Home() {
 
       <Link
         to="/comp"
-        className="absolute top-6 right-6 z-10 bg-gold text-panel font-bold px-4 py-2 rounded-lg shadow-lg hover:opacity-90 transition text-sm sm:text-base"
+        className="absolute top-6 right-6 z-10 bg-panel3 text-white border border-white/25 px-4 py-2 rounded-lg shadow-lg hover:bg-panel2 transition text-sm sm:text-base"
       >
         Meu Beta Comp
       </Link>
