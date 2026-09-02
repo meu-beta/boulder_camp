@@ -12,11 +12,16 @@
 // Regra de segurança: o caminho do boulder aqui é um adaptador fino sobre o
 // `scoring.js` que já roda em produção. `scoring.js` não é tocado.
 
-import { computeRanking as computeBoulder, ranksFrom as boulderRanks } from './scoring.js';
+import {
+  computeRanking as computeBoulder,
+  ranksFrom as boulderRanks,
+  formatScore as formatBoulderTotal,
+} from './scoring.js';
 import {
   computeLeadQualifying,
   computeLeadSingleRoute,
   ranksFrom as leadRanks,
+  formatTotal as formatLeadTotal,
 } from './scoringLead.js';
 
 const BOULDER = {
@@ -25,6 +30,11 @@ const BOULDER = {
   // Como se chama cada escalada da fase, nesta modalidade.
   climb: { one: 'Boulder', many: 'Boulders', abbr: 'B' },
   ranksFrom: boulderRanks,
+  // Como o total de uma fase é escrito na tela. No boulder é pontuação (maior
+  // é melhor); na guiada é o TP da qualificatória (menor é melhor).
+  formatTotal: formatBoulderTotal,
+  // Endereços das telas desta modalidade.
+  paths: { ranking: '/comp/boulder', staff: '/comp/staff/panel', rounds: '/comp/athlete-control/rounds' },
 
   computeRanking({ athletes, climbs, scores, previousRanks, round }) {
     return computeBoulder({
@@ -42,6 +52,12 @@ const LEAD = {
   label: 'Guiada',
   climb: { one: 'Via', many: 'Vias', abbr: 'V' },
   ranksFrom: leadRanks,
+  formatTotal: formatLeadTotal,
+  paths: {
+    ranking: '/comp/lead',
+    staff: '/comp/staff/lead',
+    rounds: '/comp/athlete-control/rounds/lead',
+  },
 
   // A Guiada tem dois cálculos distintos, escolhidos pelo número de vias:
   //   2 vias  -> qualificatória, com TP = raiz(P1 * P2)   (15.5)
