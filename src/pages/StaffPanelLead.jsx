@@ -3,38 +3,64 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
-import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
+import { formatRoute, started } from '../lib/scoringLead';
 import { EVENT_TITLE } from '../lib/event';
 import PhaseTabs from '../components/PhaseTabs';
 
-// Painel do árbitro, organizado POR BOULDER: escolhe-se o boulder e a tela
-// lista todos os atletas da fase para lançamento. É o formato que combina
-// com um juiz fixo em cada boulder.
+// Painel do árbitro da GUIADA, organizado POR VIA: escolhe-se a via e a tela
+// lista todos os atletas da fase. Mesmo formato do painel de boulder — um juiz
+// fixo por via — mas o que se lança é outra coisa.
 //
-// Só se digita Zona e Top (com o número da tentativa em que cada um foi
-// conquistado). O total de tentativas é calculado — é a tentativa da
-// última conquista — e aparece apenas como leitura.
+// O que o árbitro anota, na ordem do regulamento (15.1 a 15.3):
+//
+//   valor no croqui .. o número da agarra NO CROQUI preparado pelo routesetter.
+//                      Não é a contagem de agarras da via.
+//   controlada/usada . o "+" da súmula. Agarra apenas CONTROLADA vale o número
+//                      cheio; agarra USADA vale meia posição a mais (15.3 iii).
+//   TOP .............. finalizou a via.
+//   tempo ............ tempo total da tentativa, arredondado para baixo (15.2a).
+//                      É registrado em TODAS as tentativas, mesmo só sendo usado
+//                      como desempate na final entre as três primeiras (15.6b).
+//
+// Tudo grava na mesma tabela `scores` do boulder, nas colunas hold_value,
+// hold_used e time_seconds. As colunas de zona/tentativa ficam intocadas.
 
-// Alvos de toque grandes: o arbitro lanca pontuacao em pe, no celular.
-// O checkbox padrao (~13px) e pequeno demais; 24px fica confortavel.
-// text-base no input evita o zoom automatico do Safari no iPhone.
-// Zona em azul e Top em amarelo: as mesmas cores dos quadradinhos do
-// ranking, para o arbitro associar na hora o que esta marcando.
 const CHECKBOX = 'w-6 h-6 rounded shrink-0 cursor-pointer';
-const CHECKBOX_ZONE = CHECKBOX + ' accent-zone';
-const CHECKBOX_TOP = CHECKBOX + ' accent-gold';
-const CHECKBOX_TRIED = CHECKBOX + ' accent-white';
 const NUMBER_INPUT =
-  'w-16 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
+  'w-20 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
+const TIME_INPUT =
+  'w-24 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
 
 const EMPTY_ROW = {
   attempted: false,
-  zone: false,
-  zone_attempts: 0,
+  hold_value: '',
+  hold_used: false,
   top: false,
-  top_attempts: 0,
+  time: '',
   locked: false,
 };
+
+/** "4:32" ou "272" -> 272 segundos. Devolve null quando vazio ou ilegível. */
+export function parseTime(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return null;
+  const partes = t.split(':');
+  if (partes.length === 1) {
+    const s = Number(partes[0]);
+    return Number.isFinite(s) ? Math.max(0, Math.floor(s)) : null;
+  }
+  const m = Number(partes[0]);
+  const s = Number(partes[1]);
+  if (!Number.isFinite(m) || !Number.isFinite(s)) return null;
+  return Math.max(0, Math.floor(m) * 60 + Math.floor(s));
+}
+
+/** 272 -> "4:32". */
+export function formatTime(seconds) {
+  if (seconds == null || seconds === '') return '';
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 function LockIcon({ locked }) {
   return locked ? (
@@ -50,40 +76,28 @@ function LockIcon({ locked }) {
   );
 }
 
+/** O rascunho na forma que o scoringLead entende, para a prévia do resultado. */
+function asScore(draft) {
+  return {
+    attempted: draft.attempted || draft.top || draft.hold_value !== '',
+    top: draft.top,
+    hold_value: draft.hold_value === '' ? null : Number(draft.hold_value),
+    hold_used: draft.hold_used,
+  };
+}
+
 function AthleteRow({ athlete, draft, dirty, onChange }) {
   const locked = draft.locked;
-  const value = boulderScore(draft);
-  const attempts = attemptsOf(draft);
-  const touched = participated(draft);
+  const score = asScore(draft);
+  const texto = formatRoute(score);
+  const escalou = started(score);
 
   const update = (changes) => onChange({ ...draft, ...changes });
 
-  const setZone = (checked) => {
-    if (checked) {
-      update({
-        attempted: true,
-        zone: true,
-        zone_attempts: draft.zone_attempts || 1,
-      });
-    } else {
-      // sem zona não há top
-      update({ zone: false, zone_attempts: 0, top: false, top_attempts: 0 });
-    }
-  };
-
   const setTop = (checked) => {
-    if (checked) {
-      const attempt = draft.top_attempts || draft.zone_attempts || 1;
-      update({
-        attempted: true,
-        top: true,
-        top_attempts: attempt,
-        zone: true,
-        zone_attempts: draft.zone_attempts || attempt,
-      });
-    } else {
-      update({ top: false, top_attempts: 0 });
-    }
+    // TOP torna o valor da agarra irrelevante — o regulamento trata TOP como
+    // acima de qualquer agarra. Deixamos o número gravado, mas desabilitado.
+    update({ top: checked, attempted: checked ? true : draft.attempted });
   };
 
   return (
@@ -105,16 +119,13 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
         </span>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            <span
-              className={`text-lg font-extrabold tabular-nums ${
-                value > 0 ? 'text-gold' : 'text-white/25'
-              }`}
-            >
-              {formatScore(value)}
-            </span>
-            <span className="text-white/30 text-[11px] ml-2 tabular-nums">{attempts} tent.</span>
-          </div>
+          <span
+            className={`text-lg font-extrabold tabular-nums ${
+              escalou ? 'text-gold' : 'text-white/25'
+            }`}
+          >
+            {texto}
+          </span>
           <button
             onClick={() => update({ locked: !locked })}
             title={locked ? 'Destravar para editar' : 'Travar contra edição acidental'}
@@ -132,57 +143,88 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
       <fieldset disabled={locked} className={locked ? 'opacity-50' : ''}>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.zone}
-              onChange={(e) => setZone(e.target.checked)}
-            className={CHECKBOX_ZONE}
-            />
-            <span className="font-semibold text-zone">Zona</span>
-            <span className="text-white/40 text-xs">na tentativa</span>
+            <span className="font-semibold text-zone">Agarra</span>
             <input
               type="number"
               inputMode="numeric"
-              min={1}
-              disabled={!draft.zone}
-              value={draft.zone_attempts || ''}
-              onChange={(e) => update({ zone_attempts: Math.max(1, Number(e.target.value) || 1) })}
+              min={0}
+              disabled={draft.top}
+              placeholder="croqui"
+              value={draft.hold_value}
+              onChange={(e) =>
+                update({
+                  hold_value: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)),
+                  attempted: true,
+                })
+              }
               className={NUMBER_INPUT}
+              title="Valor da agarra NO CROQUI, definido pelo routesetter (15.1)"
             />
           </label>
+
+          {/* O "+" da súmula: controlada x usada (15.3 iii). Dois botões em vez
+              de um checkbox porque o árbitro precisa ver os dois estados
+              nomeados — "usada" e "controlada" são termos do regulamento. */}
+          <div className="flex rounded-lg overflow-hidden border border-white/15 text-xs font-semibold">
+            <button
+              type="button"
+              disabled={draft.top}
+              onClick={() => update({ hold_used: false })}
+              className={`px-3 py-2 transition disabled:opacity-30 ${
+                !draft.hold_used ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white'
+              }`}
+              title="Agarra apenas controlada — vale o número cheio"
+            >
+              controlada
+            </button>
+            <button
+              type="button"
+              disabled={draft.top}
+              onClick={() => update({ hold_used: true, attempted: true })}
+              className={`px-3 py-2 transition disabled:opacity-30 ${
+                draft.hold_used ? 'bg-zone text-panel' : 'text-white/40 hover:text-white'
+              }`}
+              title="Agarra usada — vale meia posição a mais, o + da súmula"
+            >
+              usada +
+            </button>
+          </div>
 
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={draft.top}
               onChange={(e) => setTop(e.target.checked)}
-            className={CHECKBOX_TOP}
+              className={CHECKBOX + ' accent-gold'}
             />
-            <span className="font-semibold text-gold">Top</span>
-            <span className="text-white/40 text-xs">na tentativa</span>
+            <span className="font-semibold text-gold">TOP</span>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-white/50">Tempo</span>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
-              min={1}
-              disabled={!draft.top}
-              value={draft.top_attempts || ''}
-              onChange={(e) => update({ top_attempts: Math.max(1, Number(e.target.value) || 1) })}
-              className={NUMBER_INPUT}
+              placeholder="4:32"
+              value={draft.time}
+              onChange={(e) => update({ time: e.target.value })}
+              className={TIME_INPUT}
+              title="Tempo total da tentativa, arredondado para baixo (15.2a). Aceita 4:32 ou 272."
             />
           </label>
 
           <label
             className="flex items-center gap-2 text-sm sm:ml-auto"
-            title="Marque quando o atleta escalou mas não conseguiu zona nem top. Sem isso ele seria contado como ausente (DNS)."
+            title="Marque quando o atleta largou mas não passou da primeira agarra. Sem isso ele conta como não largou, e quem não larga nas duas vias fica sem ranking (15.5c)."
           >
             <input
               type="checkbox"
               checked={draft.attempted}
-              disabled={draft.zone || draft.top}
+              disabled={draft.top || draft.hold_value !== ''}
               onChange={(e) => update({ attempted: e.target.checked })}
-            className={CHECKBOX_TRIED}
+              className={CHECKBOX + ' accent-white'}
             />
-            <span className={touched ? 'text-white/70' : 'text-white/40'}>Escalou</span>
+            <span className={escalou ? 'text-white/70' : 'text-white/40'}>Largou</span>
           </label>
         </div>
       </fieldset>
@@ -190,13 +232,13 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
   );
 }
 
-export default function StaffPanel() {
+export default function StaffPanelLead() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const { rounds, activeRound, getRound, loading, refresh } = useEvent('Boulder');
+  const { rounds, activeRound, getRound, loading, refresh } = useEvent('Lead');
 
   const [roundId, setRoundId] = useState(null);
-  const [boulderId, setBoulderId] = useState(null);
+  const [viaId, setViaId] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
@@ -205,36 +247,35 @@ export default function StaffPanel() {
     if (!roundId && activeRound) setRoundId(activeRound.id);
   }, [activeRound, roundId]);
 
-  const { round, boulders, athletes, scores } = useMemo(
+  // `boulders` é o nome da tabela; na Guiada essas linhas são as VIAS.
+  const { round, boulders: vias, athletes, scores } = useMemo(
     () => getRound(roundId),
     [getRound, roundId]
   );
 
-  // Ao trocar de fase, cai no primeiro boulder dela.
   useEffect(() => {
-    if (boulders.length === 0) {
-      setBoulderId(null);
+    if (vias.length === 0) {
+      setViaId(null);
       return;
     }
-    if (!boulders.some((b) => b.id === boulderId)) setBoulderId(boulders[0].id);
-  }, [boulders, boulderId]);
+    if (!vias.some((v) => v.id === viaId)) setViaId(vias[0].id);
+  }, [vias, viaId]);
 
-  // Monta os rascunhos de todos os atletas para o boulder selecionado.
   useEffect(() => {
-    if (!boulderId) {
+    if (!viaId) {
       setDrafts({});
       return;
     }
     const next = {};
     athletes.forEach((a) => {
-      const saved = scores.find((s) => s.athlete_id === a.id && s.boulder_id === boulderId);
+      const saved = scores.find((s) => s.athlete_id === a.id && s.boulder_id === viaId);
       next[a.id] = saved
         ? {
-            attempted: saved.attempted ?? participated(saved),
-            zone: saved.zone,
-            zone_attempts: saved.zone_attempts ?? 0,
-            top: saved.top,
-            top_attempts: saved.top_attempts ?? 0,
+            attempted: saved.attempted ?? false,
+            hold_value: saved.hold_value == null ? '' : saved.hold_value,
+            hold_used: saved.hold_used ?? false,
+            top: saved.top ?? false,
+            time: formatTime(saved.time_seconds),
             locked: saved.locked ?? false,
           }
         : { ...EMPTY_ROW };
@@ -242,46 +283,47 @@ export default function StaffPanel() {
     setDrafts(next);
     setSavedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boulderId, roundId, athletes.length, scores.length]);
+  }, [viaId, roundId, athletes.length, scores.length]);
 
   const savedFor = (athleteId) =>
-    scores.find((s) => s.athlete_id === athleteId && s.boulder_id === boulderId) ?? null;
+    scores.find((s) => s.athlete_id === athleteId && s.boulder_id === viaId) ?? null;
 
   const isDirty = (athleteId) => {
     const draft = drafts[athleteId];
     if (!draft) return false;
     const saved = savedFor(athleteId);
-    if (!saved) return draft.attempted || draft.zone || draft.top || draft.locked;
+    if (!saved) {
+      return draft.attempted || draft.top || draft.hold_value !== '' || draft.time !== '' || draft.locked;
+    }
     return (
-      draft.attempted !== (saved.attempted ?? participated(saved)) ||
-      draft.zone !== saved.zone ||
-      draft.zone_attempts !== (saved.zone_attempts ?? 0) ||
-      draft.top !== saved.top ||
-      draft.top_attempts !== (saved.top_attempts ?? 0) ||
+      draft.attempted !== (saved.attempted ?? false) ||
+      String(draft.hold_value) !== String(saved.hold_value ?? '') ||
+      draft.hold_used !== (saved.hold_used ?? false) ||
+      draft.top !== (saved.top ?? false) ||
+      parseTime(draft.time) !== (saved.time_seconds ?? null) ||
       draft.locked !== (saved.locked ?? false)
     );
   };
 
   const dirtyIds = athletes.filter((a) => isDirty(a.id)).map((a) => a.id);
-  const registered = athletes.filter((a) => participated(drafts[a.id])).length;
-  const boulder = boulders.find((b) => b.id === boulderId) ?? null;
+  const registered = athletes.filter((a) => started(asScore(drafts[a.id] ?? EMPTY_ROW))).length;
+  const via = vias.find((v) => v.id === viaId) ?? null;
 
   const handleSave = async () => {
-    if (dirtyIds.length === 0 || !boulderId) return;
+    if (dirtyIds.length === 0 || !viaId) return;
     setSaving(true);
 
     const rows = dirtyIds.map((athleteId) => {
       const draft = drafts[athleteId];
       return {
         athlete_id: athleteId,
-        boulder_id: boulderId,
-        attempted: draft.attempted || draft.zone || draft.top,
-        zone: draft.zone,
-        zone_attempts: draft.zone_attempts,
+        boulder_id: viaId,
+        attempted: draft.attempted || draft.top || draft.hold_value !== '',
         top: draft.top,
-        top_attempts: draft.top_attempts,
-        // total calculado, nunca digitado
-        attempts: attemptsOf(draft),
+        hold_value: draft.hold_value === '' ? null : Number(draft.hold_value),
+        // No TOP o "+" não faz sentido: não há agarra seguinte a controlar.
+        hold_used: draft.top ? false : draft.hold_used,
+        time_seconds: parseTime(draft.time),
         locked: draft.locked,
         updated_by: profile?.id ?? null,
         updated_at: new Date().toISOString(),
@@ -312,13 +354,13 @@ export default function StaffPanel() {
             <h1 className="text-lg sm:text-xl font-extrabold text-gold tracking-tight">
               {EVENT_TITLE}
             </h1>
-            <p className="text-white/60 text-sm mt-0.5">Staff — Painel de pontuação</p>
+            <p className="text-white/60 text-sm mt-0.5">Staff — Guiada</p>
           </div>
           <div className="flex gap-4 items-center text-sm">
-            <Link to="/comp/staff/lead" className="text-gold/80 hover:text-gold">
-              Guiada
+            <Link to="/comp/staff/panel" className="text-white/70 hover:text-white">
+              Boulder
             </Link>
-            <Link to="/comp/staff/ranking" className="text-white/70 hover:text-white">
+            <Link to="/comp/lead" className="text-white/70 hover:text-white">
               Ver ranking
             </Link>
             <button onClick={handleLogout} className="text-white/50 hover:text-white">
@@ -337,28 +379,27 @@ export default function StaffPanel() {
           <p className="text-center text-white/60 py-12">Nenhuma fase configurada.</p>
         ) : (
           <>
-            {/* Escolha do boulder */}
             <div className="mb-6">
               <p className="text-white/50 text-xs uppercase tracking-wide mb-2">
-                Boulder que você está arbitrando
+                Via que você está arbitrando
               </p>
               <div className="flex flex-wrap gap-2">
-                {boulders.map((b) => {
+                {vias.map((v) => {
                   const done = athletes.filter((a) =>
-                    participated(scores.find((s) => s.athlete_id === a.id && s.boulder_id === b.id))
+                    started(scores.find((s) => s.athlete_id === a.id && s.boulder_id === v.id))
                   ).length;
-                  const selected = b.id === boulderId;
+                  const selected = v.id === viaId;
                   return (
                     <button
-                      key={b.id}
-                      onClick={() => setBoulderId(b.id)}
+                      key={v.id}
+                      onClick={() => setViaId(v.id)}
                       className={`px-4 py-2.5 rounded-lg border font-bold transition ${
                         selected
                           ? 'bg-gold text-panel border-gold'
                           : 'bg-panel2 text-white/70 border-white/10 hover:border-white/30 hover:text-white'
                       }`}
                     >
-                      B{b.number}
+                      Via {v.number}
                       <span
                         className={`ml-2 text-xs font-normal ${
                           selected ? 'text-panel/60' : 'text-white/30'
@@ -380,9 +421,7 @@ export default function StaffPanel() {
             ) : (
               <>
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-bold">
-                    {boulder ? `Boulder ${boulder.number}` : '—'}
-                  </h2>
+                  <h2 className="text-lg font-bold">{via ? `Via ${via.number}` : '—'}</h2>
                   <p className="text-white/40 text-sm tabular-nums">
                     {registered} de {athletes.length} lançados
                   </p>

@@ -3,12 +3,24 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
-import { formatScore } from '../lib/scoring';
+import { disciplineOf } from '../lib/disciplines';
 
-// Controle das fases: quantos boulders cada uma tem, quantos atletas
+// Controle das fases: quantas escaladas cada uma tem, quantos atletas
 // avançam, qual está em andamento e a promoção dos classificados.
+//
+// Serve às duas modalidades: `categoryName` escolhe qual campeonato está sendo
+// administrado, e os rótulos ("Boulders" x "Vias") saem do disciplines.js.
 
-function RoundCard({ round, nextRound, ranking, athletesInRound, onPatch, onPromote, busy }) {
+function RoundCard({
+  round,
+  nextRound,
+  ranking,
+  athletesInRound,
+  onPatch,
+  onPromote,
+  busy,
+  discipline,
+}) {
   const [boulderCount, setBoulderCount] = useState(round.boulder_count);
   const [advanceCount, setAdvanceCount] = useState(round.advance_count ?? '');
 
@@ -58,7 +70,9 @@ function RoundCard({ round, nextRound, ranking, athletesInRound, onPatch, onProm
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="block text-xs text-white/60 mb-1">Boulders na fase</label>
+          <label className="block text-xs text-white/60 mb-1">
+            {discipline.climb.many} na fase
+          </label>
           <div className="flex gap-2">
             <input
               type="number"
@@ -126,7 +140,7 @@ function RoundCard({ round, nextRound, ranking, athletesInRound, onPatch, onProm
                     {row.athlete.name}
                   </span>
                   <span className="tabular-nums text-white/60">
-                    {formatScore(row.total)}
+                    {row.total == null ? '—' : discipline.formatTotal(row.total)}
                     {alreadyIn.has(row.athlete.id) && (
                       <span className="ml-2 text-gold/70 text-xs">✓ promovido</span>
                     )}
@@ -150,10 +164,11 @@ function RoundCard({ round, nextRound, ranking, athletesInRound, onPatch, onProm
   );
 }
 
-export default function RoundsAdmin() {
+export default function RoundsAdmin({ categoryName = 'Boulder' }) {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent('Boulder');
+  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent(categoryName);
+  const discipline = disciplineOf(category);
   const [savingStates, setSavingStates] = useState(false);
 
   const showStates = category?.show_states ?? false;
@@ -182,9 +197,16 @@ export default function RoundsAdmin() {
     setBusy(true);
     setMessage('');
 
-    // Só uma fase pode estar ativa por vez.
-    if (changes.is_active) {
-      await supabase.from('rounds').update({ is_active: false }).neq('id', roundId);
+    // Só uma fase pode estar ativa por vez — DENTRO da mesma categoria.
+    // Sem o filtro por category_id, ativar uma fase da Guiada desativaria a
+    // fase em andamento do Boulder, e vice-versa: as duas competições podem
+    // estar rolando no mesmo dia.
+    if (changes.is_active && category) {
+      await supabase
+        .from('rounds')
+        .update({ is_active: false })
+        .eq('category_id', category.id)
+        .neq('id', roundId);
     }
 
     await supabase.from('rounds').update(changes).eq('id', roundId);
@@ -250,16 +272,33 @@ export default function RoundsAdmin() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
           <div>
-            <p className="text-gold uppercase tracking-widest text-xs">Controle de Atletas</p>
+            <p className="text-gold uppercase tracking-widest text-xs">
+              Controle de Atletas — {discipline.label}
+            </p>
             <h1 className="text-2xl font-bold">Fases do campeonato</h1>
           </div>
           <div className="flex gap-4 items-center text-sm">
-            <Link to="/comp/athlete-control/register" className="text-white/70 hover:text-white">
+            <Link
+              to={
+                discipline.key === 'lead'
+                  ? '/comp/athlete-control/rounds'
+                  : '/comp/athlete-control/rounds/lead'
+              }
+              className="text-gold/80 hover:text-gold"
+            >
+              {discipline.key === 'lead' ? 'Boulder' : 'Guiada'}
+            </Link>
+            <Link
+              to={`/comp/athlete-control/register${discipline.key === 'lead' ? '/lead' : ''}`}
+              className="text-white/70 hover:text-white"
+            >
               Cadastro
             </Link>
-            <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">
-              Fila
-            </Link>
+            {discipline.key !== 'lead' && (
+              <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">
+                Fila
+              </Link>
+            )}
             <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">
               Cronômetro
             </Link>
@@ -315,6 +354,7 @@ export default function RoundsAdmin() {
                 onPatch={handlePatch}
                 onPromote={handlePromote}
                 busy={busy}
+                discipline={discipline}
               />
             ))}
           </div>

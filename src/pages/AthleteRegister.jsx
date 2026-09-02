@@ -12,11 +12,17 @@ import { STATES, isValidUf } from '../lib/states';
 // inscrito na fase — normalmente todos entram na Classificatória e as
 // fases seguintes são preenchidas pela promoção automática.
 
-export default function AthleteRegister() {
+export default function AthleteRegister({ categoryName = 'Boulder' }) {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { category, rounds, activeRound, entries, athletes, getRound, loading, refresh } =
-    useEvent('Boulder');
+    useEvent(categoryName);
+
+  // Cada modalidade tem a sua lista de atletas: o mesmo escalador que compete
+  // nas duas é cadastrado duas vezes, uma por categoria. É o que permite números
+  // de peito e inscrições independentes entre Boulder e Guiada.
+  const lead = categoryName === 'Lead';
+  const sufixo = lead ? '/lead' : '';
 
   const [roundId, setRoundId] = useState(null);
   // O estado costuma se repetir entre atletas do mesmo clube, entao ele
@@ -103,14 +109,29 @@ export default function AthleteRegister() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
           <div>
-            <p className="text-gold uppercase tracking-widest text-xs">Controle de Atletas</p>
+            <p className="text-gold uppercase tracking-widest text-xs">
+              Controle de Atletas — {lead ? 'Guiada' : 'Boulder'}
+            </p>
             <h1 className="text-2xl font-bold">Cadastro de atletas</h1>
           </div>
           <div className="flex gap-4 items-center text-sm">
-            <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">
-              Fila
+            <Link
+              to={`/comp/athlete-control/register${lead ? '' : '/lead'}`}
+              className="text-gold/80 hover:text-gold"
+            >
+              {lead ? 'Boulder' : 'Guiada'}
             </Link>
-            <Link to="/comp/athlete-control/rounds" className="text-white/70 hover:text-white">
+            {/* A fila é o rodízio entre boulders; na Guiada o atleta escala uma
+                via por vez, em ordem de largada, e a tela ainda não existe. */}
+            {!lead && (
+              <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">
+                Fila
+              </Link>
+            )}
+            <Link
+              to={`/comp/athlete-control/rounds${sufixo}`}
+              className="text-white/70 hover:text-white"
+            >
               Fases
             </Link>
             <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">
