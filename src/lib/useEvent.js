@@ -73,15 +73,30 @@ export function useEvent(categoryName = 'Boulder') {
   useEffect(() => {
     load();
 
+    // O Realtime avisa UMA VEZ POR LINHA alterada. Um árbitro salvando cinco
+    // atletas de uma vez dispara cinco avisos, e com cinco árbitros lançando ao
+    // mesmo tempo isso vira uma rajada — cada aviso recarregando o evento
+    // inteiro, em todos os celulares. Agrupar a rajada numa recarga só derruba
+    // o tráfego sem atrasar nada que dê para perceber.
+    let pendente = null;
+    const agendar = () => {
+      if (pendente) clearTimeout(pendente);
+      pendente = setTimeout(() => {
+        pendente = null;
+        load();
+      }, 400);
+    };
+
     const channel = supabase.channel('meu-beta-comp');
     ['scores', 'queue_entries', 'athletes', 'round_entries', 'rounds', 'boulders'].forEach(
       (table) => {
-        channel.on('postgres_changes', { event: '*', schema: 'public', table }, load);
+        channel.on('postgres_changes', { event: '*', schema: 'public', table }, agendar);
       }
     );
     channel.subscribe();
 
     return () => {
+      if (pendente) clearTimeout(pendente);
       supabase.removeChannel(channel);
     };
   }, [load]);
