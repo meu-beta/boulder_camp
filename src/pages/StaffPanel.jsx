@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
 import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
+import { mesclarRascunhos } from '../lib/rascunhos';
 import PhaseTabs from '../components/PhaseTabs';
 import ModalityBar from '../components/ModalityBar';
 import AttemptStepper from '../components/AttemptStepper';
@@ -217,15 +218,27 @@ export default function StaffPanel() {
   }, [boulders, boulderId]);
 
   // Monta os rascunhos de todos os atletas para o boulder selecionado.
+  //
+  // No evento há um árbitro por boulder, todos lançando ao mesmo tempo, e as
+  // pontuações chegam por Realtime para todos. Reconstruir os rascunhos a cada
+  // novidade apagaria o que os outros árbitros estão digitando — e `scores`
+  // traz a fase inteira, então a primeira pontuação de QUALQUER boulder
+  // disparava isso. Por isso aqui é mesclagem, não reconstrução: ver
+  // lib/rascunhos.js.
+  const semeadoRef = useRef({ chave: null, base: {} });
+
   useEffect(() => {
     if (!boulderId) {
       setDrafts({});
+      semeadoRef.current = { chave: null, base: {} };
       return;
     }
-    const next = {};
+
+    const chave = `${roundId}:${boulderId}`;
+    const base = {};
     athletes.forEach((a) => {
       const saved = scores.find((s) => s.athlete_id === a.id && s.boulder_id === boulderId);
-      next[a.id] = saved
+      base[a.id] = saved
         ? {
             attempted: saved.attempted ?? participated(saved),
             zone: saved.zone,
@@ -236,10 +249,15 @@ export default function StaffPanel() {
           }
         : { ...EMPTY_ROW };
     });
-    setDrafts(next);
-    setSavedAt(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boulderId, roundId, athletes.length, scores.length]);
+
+    // Trocar de boulder ou de fase é outra tela: aí sim recomeça do zero.
+    const recomecar = semeadoRef.current.chave !== chave;
+    setDrafts((atuais) =>
+      mesclarRascunhos({ base, atuais, semeados: semeadoRef.current.base, recomecar })
+    );
+    semeadoRef.current = { chave, base };
+    if (recomecar) setSavedAt(null);
+  }, [boulderId, roundId, athletes, scores]);
 
   const savedFor = (athleteId) =>
     scores.find((s) => s.athlete_id === athleteId && s.boulder_id === boulderId) ?? null;

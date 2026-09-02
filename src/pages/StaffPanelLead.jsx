@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
 import { formatRoute, started } from '../lib/scoringLead';
+import { mesclarRascunhos } from '../lib/rascunhos';
 import PhaseTabs from '../components/PhaseTabs';
 import ModalityBar from '../components/ModalityBar';
 import AttemptStepper from '../components/AttemptStepper';
@@ -254,15 +255,23 @@ export default function StaffPanelLead() {
     if (!vias.some((v) => v.id === viaId)) setViaId(vias[0].id);
   }, [vias, viaId]);
 
+  // Mesclagem, não reconstrução: com vários árbitros lançando ao mesmo tempo,
+  // reconstruir a cada novidade do Realtime apagaria o que os outros estão
+  // digitando. Ver lib/rascunhos.js.
+  const semeadoRef = useRef({ chave: null, base: {} });
+
   useEffect(() => {
     if (!viaId) {
       setDrafts({});
+      semeadoRef.current = { chave: null, base: {} };
       return;
     }
-    const next = {};
+
+    const chave = `${roundId}:${viaId}`;
+    const base = {};
     athletes.forEach((a) => {
       const saved = scores.find((s) => s.athlete_id === a.id && s.boulder_id === viaId);
-      next[a.id] = saved
+      base[a.id] = saved
         ? {
             attempted: saved.attempted ?? false,
             hold_value: saved.hold_value == null ? '' : saved.hold_value,
@@ -273,10 +282,14 @@ export default function StaffPanelLead() {
           }
         : { ...EMPTY_ROW };
     });
-    setDrafts(next);
-    setSavedAt(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viaId, roundId, athletes.length, scores.length]);
+
+    const recomecar = semeadoRef.current.chave !== chave;
+    setDrafts((atuais) =>
+      mesclarRascunhos({ base, atuais, semeados: semeadoRef.current.base, recomecar })
+    );
+    semeadoRef.current = { chave, base };
+    if (recomecar) setSavedAt(null);
+  }, [viaId, roundId, athletes, scores]);
 
   const savedFor = (athleteId) =>
     scores.find((s) => s.athlete_id === athleteId && s.boulder_id === viaId) ?? null;
