@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient';
 import { formatRoute, started } from '../lib/scoringLead';
 import PhaseTabs from '../components/PhaseTabs';
 import ModalityBar from '../components/ModalityBar';
+import AttemptStepper from '../components/AttemptStepper';
 
 // Painel do árbitro da GUIADA, organizado POR VIA: escolhe-se a via e a tela
 // lista todos os atletas da fase. Mesmo formato do painel de boulder — um juiz
@@ -25,10 +26,11 @@ import ModalityBar from '../components/ModalityBar';
 // hold_used e time_seconds. As colunas de zona/tentativa ficam intocadas.
 
 const CHECKBOX = 'w-6 h-6 rounded shrink-0 cursor-pointer';
-const NUMBER_INPUT =
-  'w-20 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
+// O tempo continua sendo campo de texto livre: aceita "4:32" e "272", e não
+// faz sentido ter − e + para somar um segundo de cada vez. h-11 mantém o mesmo
+// alvo de toque dos botões do seletor de agarra, ao lado.
 const TIME_INPUT =
-  'w-24 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
+  'w-24 h-11 px-2 rounded-lg bg-panel border border-white/20 focus:border-gold outline-none text-base text-center tabular-nums disabled:opacity-25';
 
 const EMPTY_ROW = {
   attempted: false,
@@ -141,25 +143,18 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
 
       <fieldset disabled={locked} className={locked ? 'opacity-50' : ''}>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <label className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold text-zone">Agarra</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              disabled={draft.top}
-              placeholder="croqui"
+            <AttemptStepper
               value={draft.hold_value}
-              onChange={(e) =>
-                update({
-                  hold_value: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)),
-                  attempted: true,
-                })
-              }
-              className={NUMBER_INPUT}
+              disabled={draft.top}
+              min={0}
+              permitirVazio
+              onChange={(v) => update({ hold_value: v, attempted: v !== '' || draft.attempted })}
+              ariaLabel="Valor da agarra no croqui"
               title="Valor da agarra NO CROQUI, definido pelo routesetter (15.1)"
             />
-          </label>
+          </div>
 
           {/* O "+" da súmula: controlada x usada (15.3 iii). Dois botões em vez
               de um checkbox porque o árbitro precisa ver os dois estados

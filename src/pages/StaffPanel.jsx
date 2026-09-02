@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient';
 import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
 import PhaseTabs from '../components/PhaseTabs';
 import ModalityBar from '../components/ModalityBar';
+import AttemptStepper from '../components/AttemptStepper';
 
 // Painel do árbitro, organizado POR BOULDER: escolhe-se o boulder e a tela
 // lista todos os atletas da fase para lançamento. É o formato que combina
@@ -23,8 +24,6 @@ const CHECKBOX = 'w-6 h-6 rounded shrink-0 cursor-pointer';
 const CHECKBOX_ZONE = CHECKBOX + ' accent-zone';
 const CHECKBOX_TOP = CHECKBOX + ' accent-gold';
 const CHECKBOX_TRIED = CHECKBOX + ' accent-white';
-const NUMBER_INPUT =
-  'w-16 px-2 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none text-base sm:text-sm text-center tabular-nums disabled:opacity-25';
 
 const EMPTY_ROW = {
   attempted: false,
@@ -130,45 +129,45 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
 
       <fieldset disabled={locked} className={locked ? 'opacity-50' : ''}>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.zone}
-              onChange={(e) => setZone(e.target.checked)}
-            className={CHECKBOX_ZONE}
-            />
-            <span className="font-semibold text-zone">Zona</span>
+          {/* O número fica FORA do <label>: dentro dele, qualquer toque que
+              escapasse do campo marcava ou desmarcava a caixa sem querer. */}
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.zone}
+                onChange={(e) => setZone(e.target.checked)}
+                className={CHECKBOX_ZONE}
+              />
+              <span className="font-semibold text-zone">Zona</span>
+            </label>
             <span className="text-white/40 text-xs">na tentativa</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              disabled={!draft.zone}
+            <AttemptStepper
               value={draft.zone_attempts || ''}
-              onChange={(e) => update({ zone_attempts: Math.max(1, Number(e.target.value) || 1) })}
-              className={NUMBER_INPUT}
+              disabled={!draft.zone}
+              onChange={(v) => update({ zone_attempts: v })}
+              ariaLabel="Tentativa em que conquistou a zona"
             />
-          </label>
+          </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.top}
-              onChange={(e) => setTop(e.target.checked)}
-            className={CHECKBOX_TOP}
-            />
-            <span className="font-semibold text-gold">Top</span>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={draft.top}
+                onChange={(e) => setTop(e.target.checked)}
+                className={CHECKBOX_TOP}
+              />
+              <span className="font-semibold text-gold">Top</span>
+            </label>
             <span className="text-white/40 text-xs">na tentativa</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              disabled={!draft.top}
+            <AttemptStepper
               value={draft.top_attempts || ''}
-              onChange={(e) => update({ top_attempts: Math.max(1, Number(e.target.value) || 1) })}
-              className={NUMBER_INPUT}
+              disabled={!draft.top}
+              onChange={(v) => update({ top_attempts: v })}
+              ariaLabel="Tentativa em que conquistou o top"
             />
-          </label>
+          </div>
 
           <label
             className="flex items-center gap-2 text-sm sm:ml-auto"
@@ -270,14 +269,18 @@ export default function StaffPanel() {
 
     const rows = dirtyIds.map((athleteId) => {
       const draft = drafts[athleteId];
+      // O campo de tentativas pode estar vazio se o árbitro apertou Salvar sem
+      // sair dele. Vazio não pode chegar ao banco, que espera inteiro: aqui
+      // ele vira 1, a mesma normalização que aconteceria ao sair do campo.
+      const tentativa = (v) => (v === '' || v == null ? 1 : Number(v));
       return {
         athlete_id: athleteId,
         boulder_id: boulderId,
         attempted: draft.attempted || draft.zone || draft.top,
         zone: draft.zone,
-        zone_attempts: draft.zone_attempts,
+        zone_attempts: draft.zone ? tentativa(draft.zone_attempts) : 0,
         top: draft.top,
-        top_attempts: draft.top_attempts,
+        top_attempts: draft.top ? tentativa(draft.top_attempts) : 0,
         // total calculado, nunca digitado
         attempts: attemptsOf(draft),
         locked: draft.locked,
