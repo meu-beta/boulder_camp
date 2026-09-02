@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
 import { EVENT_TITLE } from '../lib/event';
+import { GERAL } from '../lib/modalidade';
 import PhaseTabs from '../components/PhaseTabs';
 import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
 
@@ -53,17 +54,11 @@ export default function PublicInsights() {
           <p className="text-white/60 text-sm mt-0.5">Insights do evento — Boulder</p>
         </div>
         <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/70">
-          <Link to="/comp" className="hover:text-white">
-            Ranking
+          <Link to={GERAL.hub} className="hover:text-white">
+            Início
           </Link>
-          <Link to="/comp/insights" className="hover:text-white">
-            Insights
-          </Link>
-          <Link to="/comp/staff/login" className="hover:text-white">
-            Staff
-          </Link>
-          <Link to="/comp/athlete-control/login" className="hover:text-white">
-            Controle
+          <Link to="/comp/boulder" className="hover:text-white">
+            Ranking do Boulder
           </Link>
           <Link to="/" className="hover:text-white text-white/40">
             Meu Beta

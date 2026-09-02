@@ -1,48 +1,55 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
-import { EVENT_TITLE } from '../lib/event';
+import { useModalidade } from '../lib/modalidade';
+import { disciplineOf } from '../lib/disciplines';
 import RankingTable from '../components/RankingTable';
+import LeadRankingTable from '../components/LeadRankingTable';
 import PhaseTabs from '../components/PhaseTabs';
+import ModalityBar from '../components/ModalityBar';
+
+// O mesmo ranking do telão, dentro da área do árbitro: serve para conferir o
+// que acabou de ser lançado sem sair do celular. Como toda tela desta árvore,
+// mostra apenas a competição do endereço.
 
 export default function StaffRanking() {
-  const { category, rounds, activeRound, getRound, loading } = useEvent('Boulder');
+  const mod = useModalidade();
+  const { category, rounds, activeRound, getRound, loading } = useEvent(mod.categoryName);
+  const discipline = disciplineOf(category);
+  const Tabela = discipline.key === 'lead' ? LeadRankingTable : RankingTable;
   const [roundId, setRoundId] = useState(null);
 
   useEffect(() => {
     if (!roundId && activeRound) setRoundId(activeRound.id);
   }, [activeRound, roundId]);
 
-  const { round, ranking } = getRound(roundId);
+  const { round, ranking, boulders } = getRound(roundId);
 
   return (
     <div className="min-h-screen bg-panel py-8 px-4">
-      <div className="max-w-5xl mx-auto flex items-start justify-between mb-6 gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-gold tracking-tight">
-            {EVENT_TITLE}
-          </h1>
-          <p className="text-white/60 text-sm mt-0.5">Staff — Arbitragem · Ranking</p>
+      <div className="max-w-5xl mx-auto">
+        <ModalityBar area="staff" atual="ranking" subtitulo="Ranking da competição" />
+
+        <div className="mb-6">
+          <PhaseTabs
+            rounds={rounds}
+            selectedId={roundId}
+            onSelect={setRoundId}
+            abbr={discipline.climb.abbr}
+          />
         </div>
-        <Link to="/comp/staff/panel" className="text-white/70 hover:text-white text-sm">
-          Voltar ao painel
-        </Link>
-      </div>
 
-      <div className="max-w-5xl mx-auto mb-6">
-        <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />
+        {loading ? (
+          <p className="text-center text-white/60">Carregando...</p>
+        ) : (
+          <Tabela
+            ranking={ranking}
+            title={round ? round.name.toUpperCase() : 'RANKING'}
+            advanceCount={round?.advance_count ?? null}
+            showStates={category?.show_states ?? false}
+            routeCount={boulders.length || null}
+          />
+        )}
       </div>
-
-      {loading ? (
-        <p className="text-center text-white/60">Carregando...</p>
-      ) : (
-        <RankingTable
-          ranking={ranking}
-          title={round ? round.name.toUpperCase() : 'RANKING'}
-          advanceCount={round?.advance_count ?? null}
-          showStates={category?.show_states ?? false}
-        />
-      )}
     </div>
   );
 }

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
 import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
-import { EVENT_TITLE } from '../lib/event';
 import PhaseTabs from '../components/PhaseTabs';
+import ModalityBar from '../components/ModalityBar';
 
 // Painel do árbitro, organizado POR BOULDER: escolhe-se o boulder e a tela
 // lista todos os atletas da fase para lançamento. É o formato que combina
@@ -191,8 +190,7 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
 }
 
 export default function StaffPanel() {
-  const { profile, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { profile } = useAuth();
   const { rounds, activeRound, getRound, loading, refresh } = useEvent('Boulder');
 
   const [roundId, setRoundId] = useState(null);
@@ -299,33 +297,10 @@ export default function StaffPanel() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/comp/staff/login');
-  };
-
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-lg sm:text-xl font-extrabold text-gold tracking-tight">
-              {EVENT_TITLE}
-            </h1>
-            <p className="text-white/60 text-sm mt-0.5">Staff — Painel de pontuação</p>
-          </div>
-          <div className="flex gap-4 items-center text-sm">
-            <Link to="/comp/staff/lead" className="text-gold/80 hover:text-gold">
-              Guiada
-            </Link>
-            <Link to="/comp/staff/ranking" className="text-white/70 hover:text-white">
-              Ver ranking
-            </Link>
-            <button onClick={handleLogout} className="text-white/50 hover:text-white">
-              Sair
-            </button>
-          </div>
-        </div>
+        <ModalityBar area="staff" atual="painel" subtitulo="Painel de pontuação" />
 
         <div className="mb-4">
           <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />

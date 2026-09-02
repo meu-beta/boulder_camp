@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import {
   DndContext,
   closestCenter,
@@ -15,12 +14,11 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { useEvent } from '../lib/useEvent';
 import { participated } from '../lib/scoring';
-import { EVENT_TITLE } from '../lib/event';
 import PhaseTabs from '../components/PhaseTabs';
+import ModalityBar from '../components/ModalityBar';
 
 const ON_WALL_LIMIT = 2;
 
@@ -308,8 +306,8 @@ function BoulderSummary({ boulders, athletes, doneByAthlete }) {
 }
 
 export default function AthleteQueue() {
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
+  // A fila é o rodízio entre blocos e só existe no Boulder — a rota da Guiada
+  // nem chega aqui (ver FilaDaModalidade no App).
   const { rounds, activeRound, getRound, loading, refresh } = useEvent('Boulder');
 
   const [roundId, setRoundId] = useState(null);
@@ -453,36 +451,10 @@ export default function AthleteQueue() {
     refresh();
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/comp/athlete-control/login');
-  };
-
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-lg sm:text-xl font-extrabold text-gold tracking-tight">
-              {EVENT_TITLE}
-            </h1>
-            <p className="text-white/60 text-sm mt-0.5">Controle de Atletas — Fila de entrada</p>
-          </div>
-          <div className="flex gap-4 items-center text-sm">
-            <Link to="/comp/athlete-control/register" className="text-white/70 hover:text-white">
-              Cadastro
-            </Link>
-            <Link to="/comp/athlete-control/rounds" className="text-white/70 hover:text-white">
-              Fases
-            </Link>
-            <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">
-              Cronômetro
-            </Link>
-            <button onClick={handleLogout} className="text-white/50 hover:text-white">
-              Sair
-            </button>
-          </div>
-        </div>
+        <ModalityBar area="controle" atual="fila" subtitulo="Fila de entrada" />
 
         <div className="mb-6">
           <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />

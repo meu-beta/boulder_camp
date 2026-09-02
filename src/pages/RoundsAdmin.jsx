@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
 import { disciplineOf } from '../lib/disciplines';
+import { useModalidade } from '../lib/modalidade';
+import ModalityBar from '../components/ModalityBar';
 
 // Controle das fases: quantas escaladas cada uma tem, quantos atletas
 // avançam, qual está em andamento e a promoção dos classificados.
@@ -164,10 +164,9 @@ function RoundCard({
   );
 }
 
-export default function RoundsAdmin({ categoryName = 'Boulder' }) {
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
-  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent(categoryName);
+export default function RoundsAdmin() {
+  const mod = useModalidade();
+  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent(mod.categoryName);
   const discipline = disciplineOf(category);
   const [savingStates, setSavingStates] = useState(false);
 
@@ -262,51 +261,10 @@ export default function RoundsAdmin({ categoryName = 'Boulder' }) {
     setBusy(false);
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/comp/athlete-control/login');
-  };
-
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-          <div>
-            <p className="text-gold uppercase tracking-widest text-xs">
-              Controle de Atletas — {discipline.label}
-            </p>
-            <h1 className="text-2xl font-bold">Fases do campeonato</h1>
-          </div>
-          <div className="flex gap-4 items-center text-sm">
-            <Link
-              to={
-                discipline.key === 'lead'
-                  ? '/comp/athlete-control/rounds'
-                  : '/comp/athlete-control/rounds/lead'
-              }
-              className="text-gold/80 hover:text-gold"
-            >
-              {discipline.key === 'lead' ? 'Boulder' : 'Guiada'}
-            </Link>
-            <Link
-              to={`/comp/athlete-control/register${discipline.key === 'lead' ? '/lead' : ''}`}
-              className="text-white/70 hover:text-white"
-            >
-              Cadastro
-            </Link>
-            {discipline.key !== 'lead' && (
-              <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">
-                Fila
-              </Link>
-            )}
-            <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">
-              Cronômetro
-            </Link>
-            <button onClick={handleLogout} className="text-white/50 hover:text-white">
-              Sair
-            </button>
-          </div>
-        </div>
+        <ModalityBar area="controle" atual="fases" subtitulo="Fases do campeonato" />
 
         {message && (
           <p className="mb-4 px-4 py-2 rounded-lg bg-gold/10 border border-gold/30 text-gold text-sm">

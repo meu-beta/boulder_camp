@@ -1,14 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { beepCountdown, beepEnd, beepOneMinute, unlockAudio } from '../lib/beep';
 import { useFullscreen } from '../lib/useFullscreen';
+import { GERAL, rotas, useModalidade } from '../lib/modalidade';
 import FullscreenButton from '../components/FullscreenButton';
 
-// Cronômetro único, pensado para ser projetado.
-// O estado fica no Supabase (tabela timer_state, linha id = 1), então
-// qualquer tela aberta mostra exatamente o mesmo tempo.
+// Cronômetro da competição, pensado para ser projetado.
+//
+// O estado fica no Supabase, em `timer_state`, e existe UMA LINHA POR
+// CATEGORIA. Isso importa: até esta versão a tabela era um singleton, e com
+// Boulder e Guiada no mesmo dia o árbitro que zerasse um zeraria o outro no
+// meio de uma tentativa. Cada tela agora lê e escreve só na linha da sua
+// competição; todas as telas da mesma competição continuam em sincronia.
 //
 // Bips: dois em 1 minuto restante, um a cada segundo nos 5 finais,
 // e um longo no zero.
@@ -25,30 +30,59 @@ function formatClock(totalSeconds) {
 export default function AthleteTimer() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const mod = useModalidade();
+  const r = rotas(mod.slug);
 
+  const [categoryId, setCategoryId] = useState(null);
   const [state, setState] = useState(null);
   const [remaining, setRemaining] = useState(0);
   const [customMinutes, setCustomMinutes] = useState('');
   const lastBeepedSecond = useRef(null);
   const { isFullscreen, toggle, supported } = useFullscreen();
 
-  // ---- carrega e escuta o estado compartilhado ----
+  // ---- descobre a categoria desta modalidade ----
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.from('timer_state').select('*').eq('id', 1).single();
-      if (data) setState(data);
+    let vivo = true;
+    supabase
+      .from('categories')
+      .select('id')
+      .eq('name', mod.categoryName)
+      .single()
+      .then(({ data }) => {
+        if (vivo && data) setCategoryId(data.id);
+      });
+    return () => {
+      vivo = false;
     };
+  }, [mod.categoryName]);
+
+  // ---- carrega e escuta o estado da SUA competição ----
+  const load = useCallback(async () => {
+    if (!categoryId) return;
+    const { data } = await supabase
+      .from('timer_state')
+      .select('*')
+      .eq('category_id', categoryId)
+      .single();
+    if (data) setState(data);
+  }, [categoryId]);
+
+  useEffect(() => {
+    if (!categoryId) return undefined;
     load();
 
+    // O Realtime avisa qualquer mudança na tabela; `load` relê só a linha
+    // desta categoria, então mexer no cronômetro da outra competição não
+    // altera nada aqui.
     const channel = supabase
-      .channel('timer-projection')
+      .channel(`timer-${mod.slug}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'timer_state' }, load)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [categoryId, load, mod.slug]);
 
   // ---- tique local, 10x por segundo para não perder o segundo cheio ----
   useEffect(() => {
@@ -85,10 +119,11 @@ export default function AthleteTimer() {
   // ---- ações ----
   const patch = async (changes) => {
     unlockAudio();
+    if (!categoryId) return;
     await supabase
       .from('timer_state')
       .update({ ...changes, updated_at: new Date().toISOString() })
-      .eq('id', 1);
+      .eq('category_id', categoryId);
   };
 
   const handleStart = () => {
@@ -122,7 +157,7 @@ export default function AthleteTimer() {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/comp/athlete-control/login');
+    navigate(GERAL.loginControle);
   };
 
   const running = Boolean(state?.running);
@@ -142,25 +177,35 @@ export default function AthleteTimer() {
     <div className="min-h-screen bg-panel flex flex-col">
       {/* Cabeçalho discreto — some por completo em tela cheia */}
       <div className="relative z-20 flex items-center justify-between px-6 py-3 text-sm text-white/40">
-        <span className={`uppercase tracking-widest text-xs ${isFullscreen ? 'invisible' : ''}`}>
-          Cronômetro
+        {/* Em tela cheia some tudo menos o botão de sair da tela cheia. Fora
+            dela, a etiqueta colorida diz de qual competição é este cronômetro —
+            projetado numa parede, os dois relógios seriam idênticos sem ela. */}
+        <span className={`flex items-center gap-2 ${isFullscreen ? 'invisible' : ''}`}>
+          <span
+            className={`px-2 py-0.5 rounded text-[11px] font-extrabold tracking-wide uppercase ${mod.corFaixa} ${mod.corTexto}`}
+          >
+            {mod.label}
+          </span>
+          <span className="uppercase tracking-widest text-xs">Cronômetro</span>
         </span>
         <div className="flex gap-4 items-center">
           {supported && <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />}
           {isFullscreen ? null : (
             <>
-          <Link to="/comp/athlete-control/queue" className="hover:text-white">
-            Fila
-          </Link>
-          <Link to="/comp/athlete-control/register" className="hover:text-white">
-            Cadastro
-          </Link>
-          <Link to="/comp/athlete-control/rounds" className="hover:text-white">
-            Fases
-          </Link>
-          <button onClick={handleLogout} className="hover:text-white">
-            Sair
-          </button>
+              {mod.temFila && (
+                <Link to={r.fila} className="hover:text-white">
+                  Fila
+                </Link>
+              )}
+              <Link to={r.cadastro} className="hover:text-white">
+                Cadastro
+              </Link>
+              <Link to={r.fases} className="hover:text-white">
+                Fases
+              </Link>
+              <button onClick={handleLogout} className="hover:text-white">
+                Sair
+              </button>
             </>
           )}
         </div>
@@ -175,10 +220,7 @@ export default function AthleteTimer() {
           className={`timer-digits font-extrabold tabular-nums transition-colors ${digitColor} ${
             critical ? 'animate-pulse' : ''
           }`}
-          // Medido no navegador: a largura do relógio é 2,64x o tamanho da fonte.
-          // Acima de ~37vw os dígitos passam da tela e ficam cortados nas laterais,
-          // então 36vw é o teto de largura; em tela cheia sobra altura para crescer.
-          style={{ fontSize: isFullscreen ? 'min(36vw, 80vh)' : 'min(36vw, 58vh)' }}
+          style={{ fontSize: isFullscreen ? 'min(44vw, 78vh)' : 'min(38vw, 60vh)' }}
         >
           {formatClock(remaining)}
         </div>

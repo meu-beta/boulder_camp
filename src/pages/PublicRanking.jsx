@@ -5,6 +5,7 @@ import { EVENT_TITLE } from '../lib/event';
 import RankingTable from '../components/RankingTable';
 import LeadRankingTable from '../components/LeadRankingTable';
 import { disciplineOf } from '../lib/disciplines';
+import { GERAL, useModalidade } from '../lib/modalidade';
 import PhaseTabs from '../components/PhaseTabs';
 import FullscreenButton from '../components/FullscreenButton';
 import { useFullscreen } from '../lib/useFullscreen';
@@ -15,10 +16,11 @@ const BOTTOM_HOLD_MS = 3000; // respiro no último colocado antes do corte
 const SCROLL_SPEED = 38; // pixels por segundo — leitura confortável de longe
 const BOARD_WIDTH = 1024; // largura de autoria da tabela (max-w-5xl), antes da escala
 
-// `categoryName` escolhe a modalidade. O padrão é Boulder para que /comp
-// continue exatamente como está — é o endereço que o telão já usa.
-export default function PublicRanking({ categoryName = 'Boulder' }) {
-  const { category, rounds, activeRound, getRound, loading } = useEvent(categoryName);
+// A modalidade vem do endereço: /comp/boulder ou /comp/guiada. Cada telão do
+// evento fica apontado para a sua, e nunca troca sozinho.
+export default function PublicRanking() {
+  const mod = useModalidade();
+  const { category, rounds, activeRound, getRound, loading } = useEvent(mod.categoryName);
   const discipline = disciplineOf(category);
   const Table = discipline.key === 'lead' ? LeadRankingTable : RankingTable;
   const [roundId, setRoundId] = useState(null);
@@ -196,28 +198,28 @@ export default function PublicRanking({ categoryName = 'Boulder' }) {
     <div className="min-h-screen bg-panel py-8 px-4">
       <div className="max-w-5xl mx-auto flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className={`px-2 py-0.5 rounded text-xs font-extrabold tracking-wide uppercase ${mod.corFaixa} ${mod.corTexto}`}
+            >
+              {mod.label}
+            </span>
+          </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-gold tracking-tight">
             {EVENT_TITLE}
           </h1>
-          <p className="text-white/60 text-sm mt-0.5">Ranking ao vivo — {discipline.label}</p>
+          <p className="text-white/60 text-sm mt-0.5">Ranking ao vivo</p>
         </div>
 
+        {/* Nada aqui leva à outra competição: este é o endereço que fica
+            projetado no telão o dia inteiro. Para trocar, passa-se pelo hub. */}
         <div className="flex items-center gap-4 ml-auto">
           <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/70">
-            <Link to="/comp" className="hover:text-white">
-              Boulder
-            </Link>
-            <Link to="/comp/lead" className="hover:text-white">
-              Guiada
+            <Link to={GERAL.hub} className="hover:text-white">
+              Início
             </Link>
             <Link to="/comp/insights" className="hover:text-white">
               Insights
-            </Link>
-            <Link to="/comp/staff/login" className="hover:text-white">
-              Staff
-            </Link>
-            <Link to="/comp/athlete-control/login" className="hover:text-white">
-              Controle
             </Link>
             <Link to="/" className="hover:text-white text-white/40">
               Meu Beta

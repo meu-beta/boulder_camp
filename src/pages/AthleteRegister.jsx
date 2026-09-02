@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { useEvent } from '../lib/useEvent';
+import { useModalidade } from '../lib/modalidade';
+import { disciplineOf } from '../lib/disciplines';
 import PhaseTabs from '../components/PhaseTabs';
+import ModalityBar from '../components/ModalityBar';
 import StateFlag from '../components/StateFlag';
 import { STATES, isValidUf } from '../lib/states';
 
@@ -12,17 +13,15 @@ import { STATES, isValidUf } from '../lib/states';
 // inscrito na fase — normalmente todos entram na Classificatória e as
 // fases seguintes são preenchidas pela promoção automática.
 
-export default function AthleteRegister({ categoryName = 'Boulder' }) {
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
+export default function AthleteRegister() {
+  const mod = useModalidade();
   const { category, rounds, activeRound, entries, athletes, getRound, loading, refresh } =
-    useEvent(categoryName);
+    useEvent(mod.categoryName);
+  const discipline = disciplineOf(category);
 
   // Cada modalidade tem a sua lista de atletas: o mesmo escalador que compete
   // nas duas é cadastrado duas vezes, uma por categoria. É o que permite números
   // de peito e inscrições independentes entre Boulder e Guiada.
-  const lead = categoryName === 'Lead';
-  const sufixo = lead ? '/lead' : '';
 
   const [roundId, setRoundId] = useState(null);
   // O estado costuma se repetir entre atletas do mesmo clube, entao ele
@@ -99,52 +98,18 @@ export default function AthleteRegister({ categoryName = 'Boulder' }) {
     refresh();
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/comp/athlete-control/login');
-  };
-
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-          <div>
-            <p className="text-gold uppercase tracking-widest text-xs">
-              Controle de Atletas — {lead ? 'Guiada' : 'Boulder'}
-            </p>
-            <h1 className="text-2xl font-bold">Cadastro de atletas</h1>
-          </div>
-          <div className="flex gap-4 items-center text-sm">
-            <Link
-              to={`/comp/athlete-control/register${lead ? '' : '/lead'}`}
-              className="text-gold/80 hover:text-gold"
-            >
-              {lead ? 'Boulder' : 'Guiada'}
-            </Link>
-            {/* A fila é o rodízio entre boulders; na Guiada o atleta escala uma
-                via por vez, em ordem de largada, e a tela ainda não existe. */}
-            {!lead && (
-              <Link to="/comp/athlete-control/queue" className="text-white/70 hover:text-white">
-                Fila
-              </Link>
-            )}
-            <Link
-              to={`/comp/athlete-control/rounds${sufixo}`}
-              className="text-white/70 hover:text-white"
-            >
-              Fases
-            </Link>
-            <Link to="/comp/athlete-control/timer" className="text-white/70 hover:text-white">
-              Cronômetro
-            </Link>
-            <button onClick={handleLogout} className="text-white/50 hover:text-white">
-              Sair
-            </button>
-          </div>
-        </div>
+        <ModalityBar area="controle" atual="cadastro" subtitulo="Cadastro de atletas" />
 
         <div className="mb-6">
-          <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />
+          <PhaseTabs
+            rounds={rounds}
+            selectedId={roundId}
+            onSelect={setRoundId}
+            abbr={discipline.climb.abbr}
+          />
           <p className="text-white/40 text-xs mt-2">
             A marcação abaixo mostra quem está inscrito na fase selecionada.
           </p>
