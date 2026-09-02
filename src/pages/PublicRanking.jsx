@@ -33,7 +33,8 @@ export default function PublicRanking({ categoryName = 'Boulder' }) {
     if (!roundId && activeRound) setRoundId(activeRound.id);
   }, [activeRound, roundId]);
 
-  const { round, ranking } = getRound(roundId);
+  // `boulders` são as escaladas da fase — blocos no boulder, vias na guiada.
+  const { round, ranking, boulders } = getRound(roundId);
 
   // ---- Congelamento entre voltas ----
   // O ranking chega ao vivo pelo Realtime: assim que um árbitro salva, as
@@ -171,6 +172,7 @@ export default function PublicRanking({ categoryName = 'Boulder' }) {
         title={round ? round.name.toUpperCase() : 'RANKING'}
         advanceCount={round?.advance_count ?? null}
         showStates={category?.show_states ?? false}
+        routeCount={boulders.length || null}
       />
     </div>
   );
@@ -226,7 +228,12 @@ export default function PublicRanking({ categoryName = 'Boulder' }) {
       </div>
 
       <div className="max-w-5xl mx-auto mb-6">
-        <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />
+        <PhaseTabs
+          rounds={rounds}
+          selectedId={roundId}
+          onSelect={setRoundId}
+          abbr={discipline.climb.abbr}
+        />
       </div>
 
       {loading ? <p className="text-center text-white/60">Carregando ranking...</p> : board}

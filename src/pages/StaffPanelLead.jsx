@@ -370,7 +370,7 @@ export default function StaffPanelLead() {
         </div>
 
         <div className="mb-4">
-          <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />
+          <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} abbr="V" />
         </div>
 
         {loading ? (
