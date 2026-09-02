@@ -65,9 +65,12 @@ export default function LeadRankingTable({
   title = 'RANKING',
   advanceCount = null,
   showStates = false,
+  routeCount = null,
 }) {
-  // A fase é a qualificatória quando os atletas têm duas vias lançadas.
-  const vias = ranking?.[0]?.byRoute?.length ?? 1;
+  // A fase é a qualificatória quando tem duas vias. `routeCount` vem da própria
+  // fase e é a fonte boa: com a fase ainda vazia não existe linha de ranking de
+  // onde deduzir isso, e o cabeçalho cairia em Resultado/Tempo por engano.
+  const vias = routeCount ?? ranking?.[0]?.byRoute?.length ?? 1;
   const qualificatoria = vias >= 2;
   const colunas = qualificatoria ? vias + 1 : 2;
   const total = 2 + colunas;
@@ -137,7 +140,9 @@ export default function LeadRankingTable({
 
                   {qualificatoria ? (
                     <>
-                      {row.byRoute.map((via, i) => (
+                      {/* Percorre o número de vias do cabeçalho, não o tamanho
+                          de byRoute, para que as colunas nunca desalinhem. */}
+                      {Array.from({ length: vias }, (_, i) => row.byRoute[i] ?? {}).map((via, i) => (
                         <td key={i} className="py-2.5 px-2 sm:px-3 text-center tabular-nums">
                           <span className={via.score?.top ? 'text-gold font-bold' : 'text-white'}>
                             {formatRoute(via.score)}

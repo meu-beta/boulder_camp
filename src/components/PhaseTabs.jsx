@@ -1,6 +1,9 @@
 // Abas das fases do campeonato. A fase que está acontecendo agora
 // ganha um ponto dourado pulsando ao lado do nome.
-export default function PhaseTabs({ rounds, selectedId, onSelect }) {
+//
+// `abbr` é a letra da escalada na modalidade: B de Boulder, V de Via. O padrão
+// é B para que nada mude nas telas de boulder que não passam a propriedade.
+export default function PhaseTabs({ rounds, selectedId, onSelect, abbr = 'B' }) {
   if (!rounds || rounds.length === 0) return null;
 
   return (
@@ -28,7 +31,8 @@ export default function PhaseTabs({ rounds, selectedId, onSelect }) {
               )}
               {round.name}
               <span className={selected ? 'text-panel/60' : 'text-white/30'}>
-                {round.boulder_count}B
+                {round.boulder_count}
+                {abbr}
               </span>
             </span>
           </button>
