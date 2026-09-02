@@ -198,6 +198,9 @@ export default function StaffPanel() {
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
+  // Wifi de ginásio cai. Se a gravação falhar e ninguém avisar, o árbitro segue
+  // lançando por cima de dados que nunca chegaram ao banco.
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     if (!roundId && activeRound) setRoundId(activeRound.id);
@@ -312,10 +315,15 @@ export default function StaffPanel() {
       .upsert(rows, { onConflict: 'athlete_id,boulder_id' });
 
     setSaving(false);
-    if (!error) {
-      setSavedAt(new Date());
-      refresh();
+    if (error) {
+      // Nada é limpo: os lançamentos continuam na tela, e basta tentar de novo
+      // quando a conexão voltar.
+      setSaveError(error.message || 'Erro desconhecido');
+      return;
     }
+    setSaveError(null);
+    setSavedAt(new Date());
+    refresh();
   };
 
   return (
@@ -397,18 +405,32 @@ export default function StaffPanel() {
                 </div>
 
                 <div className="sticky bottom-4">
+                  {saveError && (
+                    <div className="mb-2 rounded-xl border border-alert bg-alert/15 px-4 py-3">
+                      <p className="text-alert font-bold text-sm">Não salvou.</p>
+                      <p className="text-white/80 text-sm mt-0.5">
+                        Os lançamentos continuam aqui na tela. Confira a conexão e toque em Salvar
+                        de novo.
+                      </p>
+                      <p className="text-white/35 text-[11px] mt-1 break-words">{saveError}</p>
+                    </div>
+                  )}
                   <button
                     onClick={handleSave}
                     disabled={dirtyIds.length === 0 || saving}
-                    className="w-full bg-gold text-panel font-bold py-3 rounded-xl shadow-lg hover:opacity-90 disabled:opacity-40"
+                    className={`w-full font-bold py-3 rounded-xl shadow-lg hover:opacity-90 disabled:opacity-40 ${
+                      saveError ? 'bg-alert text-white' : 'bg-gold text-panel'
+                    }`}
                   >
                     {saving
                       ? 'Salvando...'
                       : dirtyIds.length === 0
                       ? 'Tudo salvo'
+                      : saveError
+                      ? `Tentar de novo — ${dirtyIds.length} atleta${dirtyIds.length > 1 ? 's' : ''}`
                       : `Salvar ${dirtyIds.length} atleta${dirtyIds.length > 1 ? 's' : ''}`}
                   </button>
-                  {savedAt && dirtyIds.length === 0 && (
+                  {savedAt && dirtyIds.length === 0 && !saveError && (
                     <p className="text-center text-white/40 text-xs mt-2">
                       Salvo às {savedAt.toLocaleTimeString('pt-BR')}
                     </p>

@@ -93,7 +93,30 @@ export default function AthleteRegister() {
     refresh();
   };
 
+  // Remover atleta é a ação mais destrutiva do sistema: no banco, `scores`
+  // aponta para `athletes` em CASCADE, então apagar o atleta apaga junto TODAS
+  // as pontuações dele, em todas as fases, sem volta. Num evento, com o dedo
+  // apressado num celular, um toque só não pode fazer isso.
+  //
+  // A confirmação é em dois toques na própria linha, e não numa caixa do
+  // navegador: caixa de diálogo no celular aparece longe do dedo, é fácil de
+  // confirmar no automático, e algumas travam a tela.
+  const [confirmandoId, setConfirmandoId] = useState(null);
+
+  useEffect(() => {
+    if (!confirmandoId) return undefined;
+    // Some sozinho: se a pessoa se distraiu, o botão volta ao normal e não fica
+    // uma remoção armada esperando um toque acidental.
+    const id = setTimeout(() => setConfirmandoId(null), 6000);
+    return () => clearTimeout(id);
+  }, [confirmandoId]);
+
   const handleDelete = async (id) => {
+    if (confirmandoId !== id) {
+      setConfirmandoId(id);
+      return;
+    }
+    setConfirmandoId(null);
     await supabase.from('athletes').delete().eq('id', id);
     refresh();
   };
@@ -191,12 +214,32 @@ export default function AthleteRegister() {
                       <span className="text-white/40 ml-2 text-sm">{a.country_code}</span>
                     ) : null}
                   </span>
-                  <button
-                    onClick={() => handleDelete(a.id)}
-                    className="text-alert/70 hover:text-alert text-sm"
-                  >
-                    Remover
-                  </button>
+                  {confirmandoId === a.id ? (
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-alert text-xs text-right leading-tight">
+                        Apaga o atleta e<br />todas as pontuações
+                      </span>
+                      <button
+                        onClick={() => handleDelete(a.id)}
+                        className="px-3 py-2 rounded-lg bg-alert text-white text-sm font-bold"
+                      >
+                        Apagar
+                      </button>
+                      <button
+                        onClick={() => setConfirmandoId(null)}
+                        className="px-3 py-2 rounded-lg border border-white/20 text-white/70 text-sm"
+                      >
+                        Não
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleDelete(a.id)}
+                      className="text-alert/70 hover:text-alert text-sm shrink-0"
+                    >
+                      Remover
+                    </button>
+                  )}
                 </div>
               );
             })}

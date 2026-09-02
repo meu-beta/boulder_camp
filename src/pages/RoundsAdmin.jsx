@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
 import { disciplineOf } from '../lib/disciplines';
@@ -23,6 +23,18 @@ function RoundCard({
 }) {
   const [boulderCount, setBoulderCount] = useState(round.boulder_count);
   const [advanceCount, setAdvanceCount] = useState(round.advance_count ?? '');
+  const [confirmandoCorte, setConfirmandoCorte] = useState(false);
+
+  // Quais escaladas seriam removidas, para poder dizer isso por extenso.
+  const reduzindo = boulderCount < round.boulder_count;
+  const cortadas = reduzindo
+    ? Array.from({ length: round.boulder_count - boulderCount }, (_, i) => boulderCount + i + 1)
+    : [];
+
+  // Mexer no número de novo desarma a confirmação.
+  useEffect(() => {
+    setConfirmandoCorte(false);
+  }, [boulderCount]);
 
   const qualified = ranking.filter(
     (r) => r.status === 'ranked' && r.rank && r.rank <= (round.advance_count ?? 0)
@@ -83,13 +95,38 @@ function RoundCard({
               className="w-full px-3 py-2 rounded bg-panel border border-white/20 focus:border-gold outline-none"
             />
             <button
-              onClick={() => onPatch(round.id, { boulder_count: boulderCount }, true)}
+              onClick={() => {
+                // Reduzir o número apaga as escaladas excedentes, e `scores`
+                // aponta para elas em CASCADE: some junto tudo o que já foi
+                // lançado nelas. Aumentar não tem risco, então só a redução
+                // pede confirmação.
+                if (reduzindo && !confirmandoCorte) {
+                  setConfirmandoCorte(true);
+                  return;
+                }
+                setConfirmandoCorte(false);
+                onPatch(round.id, { boulder_count: boulderCount }, true);
+              }}
               disabled={busy || boulderCount === round.boulder_count}
-              className="px-3 rounded bg-white/10 text-white text-sm font-semibold disabled:opacity-30"
+              className={`px-3 rounded text-sm font-semibold disabled:opacity-30 ${
+                confirmandoCorte ? 'bg-alert text-white' : 'bg-white/10 text-white'
+              }`}
             >
-              OK
+              {confirmandoCorte ? 'Apagar' : 'OK'}
             </button>
           </div>
+
+          {reduzindo && (
+            <p className={`text-xs mt-1.5 ${confirmandoCorte ? 'text-alert' : 'text-white/40'}`}>
+              {confirmandoCorte
+                ? `Confirma? Some tudo o que já foi lançado ${
+                    cortadas.length === 1 ? 'na' : 'nas'
+                  } ${discipline.climb.abbr}${cortadas.join(`, ${discipline.climb.abbr}`)}.`
+                : `Reduzir apaga ${discipline.climb.abbr}${cortadas.join(
+                    `, ${discipline.climb.abbr}`
+                  )} e as pontuações delas.`}
+            </p>
+          )}
         </div>
 
         <div>
