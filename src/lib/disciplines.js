@@ -33,8 +33,6 @@ const BOULDER = {
   // Como o total de uma fase é escrito na tela. No boulder é pontuação (maior
   // é melhor); na guiada é o TP da qualificatória (menor é melhor).
   formatTotal: formatBoulderTotal,
-  // Endereços das telas desta modalidade.
-  paths: { ranking: '/comp/boulder', staff: '/comp/staff/panel', rounds: '/comp/athlete-control/rounds' },
 
   computeRanking({ athletes, climbs, scores, previousRanks, round }) {
     return computeBoulder({
@@ -53,11 +51,6 @@ const LEAD = {
   climb: { one: 'Via', many: 'Vias', abbr: 'V' },
   ranksFrom: leadRanks,
   formatTotal: formatLeadTotal,
-  paths: {
-    ranking: '/comp/lead',
-    staff: '/comp/staff/lead',
-    rounds: '/comp/athlete-control/rounds/lead',
-  },
 
   // A Guiada tem dois cálculos distintos, escolhidos pelo número de vias:
   //   2 vias  -> qualificatória, com TP = raiz(P1 * P2)   (15.5)
