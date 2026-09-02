@@ -7,6 +7,7 @@ import PublicInsights from './pages/PublicInsights';
 
 import StaffLogin from './pages/StaffLogin';
 import StaffPanel from './pages/StaffPanel';
+import StaffPanelLead from './pages/StaffPanelLead';
 import StaffRanking from './pages/StaffRanking';
 
 import AthleteRegister from './pages/AthleteRegister';
@@ -40,6 +41,15 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      {/* Guiada: mesmo login de staff, painel proprio (croqui, +, tempo). */}
+      <Route
+        path="/comp/staff/lead"
+        element={
+          <ProtectedRoute role="staff" redirectTo="/comp/staff/login">
+            <StaffPanelLead />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/comp/staff/ranking"
         element={
@@ -69,10 +79,26 @@ export default function App() {
         }
       />
       <Route
+        path="/comp/athlete-control/register/lead"
+        element={
+          <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
+            <AthleteRegister categoryName="Lead" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/comp/athlete-control/rounds"
         element={
           <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
             <RoundsAdmin />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/comp/athlete-control/rounds/lead"
+        element={
+          <ProtectedRoute role="athlete_control" redirectTo="/comp/athlete-control/login">
+            <RoundsAdmin categoryName="Lead" />
           </ProtectedRoute>
         }
       />
