@@ -196,6 +196,23 @@ t('dia sem zero a esquerda', () => {
   assert.equal(periodoEmTexto('2026-03-05', '2026-03-05'), '5 de março');
 });
 
+// Pegado em produção: um evento de 15/10/2026 a 15/10/2027 aparecia como
+// "15 e 15 de outubro", disfarçado de evento de um dia.
+t('anos diferentes aparecem', () => {
+  assert.equal(
+    periodoEmTexto('2026-10-15', '2027-10-15'),
+    '15 de outubro de 2026 a 15 de outubro de 2027'
+  );
+});
+
+t('mesmo dia e mes em anos diferentes nao colapsa', () => {
+  assert.notEqual(periodoEmTexto('2026-10-15', '2027-10-15'), '15 de outubro');
+});
+
+t('mesmo dia repetido no mesmo mes nao vira "15 e 15"', () => {
+  assert.equal(periodoEmTexto('2026-10-15', '2026-10-15'), '15 de outubro');
+});
+
 // ------------------------------------------------------------
 // Slug
 // ------------------------------------------------------------
