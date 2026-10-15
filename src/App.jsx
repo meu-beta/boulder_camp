@@ -7,6 +7,7 @@ import EventPicker from './pages/EventPicker';
 import EventoGuard from './components/EventoGuard';
 import PublicRanking from './pages/PublicRanking';
 import PublicInsights from './pages/PublicInsights';
+import EventReport from './pages/EventReport';
 
 import AdminEvents from './pages/AdminEvents';
 import AdminEventForm from './pages/AdminEventForm';
@@ -118,6 +119,7 @@ export default function App() {
       <Route path="/comp/e/:evento" element={<EventoGuard />}>
         <Route index element={<PublicRanking />} />
         <Route path="insights" element={<PublicInsights />} />
+        <Route path="relatorio" element={<EventReport />} />
 
         <Route path="staff" element={staff(<PainelDoArbitro />)} />
         <Route path="staff/ranking" element={staff(<StaffRanking />)} />
