@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
-import { EVENT_TITLE } from '../lib/event';
 import RankingTable from '../components/RankingTable';
 import LeadRankingTable from '../components/LeadRankingTable';
 import { disciplineOf } from '../lib/disciplines';
-import { GERAL, useModalidade } from '../lib/modalidade';
+import { GERAL, useEventoAtual } from '../lib/evento';
 import PhaseTabs from '../components/PhaseTabs';
 import FullscreenButton from '../components/FullscreenButton';
 import { useFullscreen } from '../lib/useFullscreen';
@@ -19,8 +18,8 @@ const BOARD_WIDTH = 1024; // largura de autoria da tabela (max-w-5xl), antes da 
 // A modalidade vem do endereço: /comp/boulder ou /comp/guiada. Cada telão do
 // evento fica apontado para a sua, e nunca troca sozinho.
 export default function PublicRanking() {
-  const mod = useModalidade();
-  const { category, rounds, activeRound, getRound, loading } = useEvent(mod.categoryName);
+  const mod = useEventoAtual();
+  const { category, rounds, activeRound, getRound, loading } = useEvent(mod.slug);
   const discipline = disciplineOf(category);
   const Table = discipline.key === 'lead' ? LeadRankingTable : RankingTable;
   const [roundId, setRoundId] = useState(null);
@@ -166,7 +165,7 @@ export default function PublicRanking() {
     >
       {isFullscreen && (
         <h1 className="text-2xl font-extrabold text-gold tracking-tight mb-3 text-center">
-          {EVENT_TITLE}
+          {mod.name}
         </h1>
       )}
       <Table
@@ -206,7 +205,7 @@ export default function PublicRanking() {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-gold tracking-tight">
-            {EVENT_TITLE}
+            {mod.name}
           </h1>
           <p className="text-white/60 text-sm mt-0.5">Ranking ao vivo</p>
         </div>

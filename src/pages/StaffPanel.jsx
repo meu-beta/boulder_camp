@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
+import { useSlugAtual } from '../lib/evento';
 import { supabase } from '../supabaseClient';
 import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
 import { mesclarRascunhos } from '../lib/rascunhos';
 import PhaseTabs from '../components/PhaseTabs';
-import ModalityBar from '../components/ModalityBar';
+import EventBar from '../components/EventBar';
 import AttemptStepper from '../components/AttemptStepper';
 
 // Painel do árbitro, organizado POR BOULDER: escolhe-se o boulder e a tela
@@ -191,7 +192,7 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
 
 export default function StaffPanel() {
   const { profile } = useAuth();
-  const { rounds, activeRound, getRound, loading, refresh } = useEvent('Boulder');
+  const { rounds, activeRound, getRound, loading, refresh } = useEvent(useSlugAtual());
 
   const [roundId, setRoundId] = useState(null);
   const [boulderId, setBoulderId] = useState(null);
@@ -329,7 +330,7 @@ export default function StaffPanel() {
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <ModalityBar area="staff" atual="painel" subtitulo="Painel de pontuação" />
+        <EventBar area="staff" atual="painel" subtitulo="Painel de pontuação" />
 
         <div className="mb-4">
           <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />

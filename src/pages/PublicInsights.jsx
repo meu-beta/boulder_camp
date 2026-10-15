@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
+import { useSlugAtual } from '../lib/evento';
 import { EVENT_TITLE } from '../lib/event';
-import { GERAL } from '../lib/modalidade';
+import { GERAL } from '../lib/evento';
 import PhaseTabs from '../components/PhaseTabs';
 import { attemptsOf, boulderScore, formatScore, participated } from '../lib/scoring';
 
@@ -17,7 +18,7 @@ function StatCard({ label, value, sub }) {
 }
 
 export default function PublicInsights() {
-  const { rounds, activeRound, getRound, loading } = useEvent('Boulder');
+  const { rounds, activeRound, getRound, loading } = useEvent(useSlugAtual());
   const [roundId, setRoundId] = useState(null);
 
   useEffect(() => {
