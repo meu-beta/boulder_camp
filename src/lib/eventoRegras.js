@@ -120,8 +120,8 @@ const MESES = [
 export function periodoEmTexto(inicio, fim) {
   if (!inicio && !fim) return '';
   const partes = (iso) => {
-    const [, m, d] = (iso ?? '').split('-');
-    return { mes: MESES[Number(m) - 1] ?? '', dia: String(Number(d)) };
+    const [a, m, d] = (iso ?? '').split('-');
+    return { ano: a ?? '', mes: MESES[Number(m) - 1] ?? '', dia: String(Number(d)) };
   };
   if (!fim || fim === inicio) {
     const a = partes(inicio);
@@ -134,7 +134,16 @@ export function periodoEmTexto(inicio, fim) {
   const a = partes(inicio);
   const b = partes(fim);
   if (!a.mes || !b.mes) return '';
-  if (a.mes === b.mes) return `${a.dia} e ${b.dia} de ${a.mes}`;
+
+  // Anos diferentes precisam aparecer. Sem isto, 15/10/2026 a 15/10/2027 vira
+  // "15 e 15 de outubro" — que é como um evento de um ano inteiro se disfarça
+  // de evento de um dia. Apareceu em produção no primeiro teste.
+  if (a.ano !== b.ano) {
+    return `${a.dia} de ${a.mes} de ${a.ano} a ${b.dia} de ${b.mes} de ${b.ano}`;
+  }
+  if (a.mes === b.mes) {
+    return a.dia === b.dia ? `${a.dia} de ${a.mes}` : `${a.dia} e ${b.dia} de ${a.mes}`;
+  }
   return `${a.dia} de ${a.mes} a ${b.dia} de ${b.mes}`;
 }
 
