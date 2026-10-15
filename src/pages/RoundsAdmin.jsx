@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useEvent } from '../lib/useEvent';
 import { supabase } from '../supabaseClient';
 import { disciplineOf } from '../lib/disciplines';
-import { useModalidade } from '../lib/modalidade';
-import ModalityBar from '../components/ModalityBar';
+import { useEventoAtual } from '../lib/evento';
+import EventBar from '../components/EventBar';
 
 // Controle das fases: quantas escaladas cada uma tem, quantos atletas
 // avançam, qual está em andamento e a promoção dos classificados.
@@ -202,8 +202,8 @@ function RoundCard({
 }
 
 export default function RoundsAdmin() {
-  const mod = useModalidade();
-  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent(mod.categoryName);
+  const mod = useEventoAtual();
+  const { category, rounds, entries, rankingByRound, loading, refresh } = useEvent(mod.slug);
   const discipline = disciplineOf(category);
   const [savingStates, setSavingStates] = useState(false);
 
@@ -301,7 +301,7 @@ export default function RoundsAdmin() {
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-3xl mx-auto">
-        <ModalityBar area="controle" atual="fases" subtitulo="Fases do campeonato" />
+        <EventBar area="controle" atual="fases" subtitulo="Fases do campeonato" />
 
         {message && (
           <p className="mb-4 px-4 py-2 rounded-lg bg-gold/10 border border-gold/30 text-gold text-sm">

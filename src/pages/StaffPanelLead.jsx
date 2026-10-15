@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useEvent } from '../lib/useEvent';
+import { useSlugAtual } from '../lib/evento';
 import { supabase } from '../supabaseClient';
 import { formatRoute, started } from '../lib/scoringLead';
 import { mesclarRascunhos } from '../lib/rascunhos';
 import PhaseTabs from '../components/PhaseTabs';
-import ModalityBar from '../components/ModalityBar';
+import EventBar from '../components/EventBar';
 import AttemptStepper from '../components/AttemptStepper';
 
 // Painel do árbitro da GUIADA, organizado POR VIA: escolhe-se a via e a tela
@@ -229,7 +230,7 @@ function AthleteRow({ athlete, draft, dirty, onChange }) {
 
 export default function StaffPanelLead() {
   const { profile } = useAuth();
-  const { rounds, activeRound, getRound, loading, refresh } = useEvent('Lead');
+  const { rounds, activeRound, getRound, loading, refresh } = useEvent(useSlugAtual());
 
   const [roundId, setRoundId] = useState(null);
   const [viaId, setViaId] = useState(null);
@@ -358,7 +359,7 @@ export default function StaffPanelLead() {
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <ModalityBar area="staff" atual="painel" subtitulo="Painel de pontuação" />
+        <EventBar area="staff" atual="painel" subtitulo="Painel de pontuação" />
 
         <div className="mb-4">
           <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} abbr="V" />

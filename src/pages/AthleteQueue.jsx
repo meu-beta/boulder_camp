@@ -16,9 +16,10 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../supabaseClient';
 import { useEvent } from '../lib/useEvent';
+import { useSlugAtual } from '../lib/evento';
 import { participated } from '../lib/scoring';
 import PhaseTabs from '../components/PhaseTabs';
-import ModalityBar from '../components/ModalityBar';
+import EventBar from '../components/EventBar';
 
 const ON_WALL_LIMIT = 2;
 
@@ -308,7 +309,7 @@ function BoulderSummary({ boulders, athletes, doneByAthlete }) {
 export default function AthleteQueue() {
   // A fila é o rodízio entre blocos e só existe no Boulder — a rota da Guiada
   // nem chega aqui (ver FilaDaModalidade no App).
-  const { rounds, activeRound, getRound, loading, refresh } = useEvent('Boulder');
+  const { rounds, activeRound, getRound, loading, refresh } = useEvent(useSlugAtual());
 
   const [roundId, setRoundId] = useState(null);
   const [addingId, setAddingId] = useState('');
@@ -454,7 +455,7 @@ export default function AthleteQueue() {
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        <ModalityBar area="controle" atual="fila" subtitulo="Fila de entrada" />
+        <EventBar area="controle" atual="fila" subtitulo="Fila de entrada" />
 
         <div className="mb-6">
           <PhaseTabs rounds={rounds} selectedId={roundId} onSelect={setRoundId} />

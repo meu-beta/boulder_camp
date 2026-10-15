@@ -4,7 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { supabase } from '../supabaseClient';
 import { beepCountdown, beepEnd, beepOneMinute, unlockAudio } from '../lib/beep';
 import { useFullscreen } from '../lib/useFullscreen';
-import { GERAL, rotas, useModalidade } from '../lib/modalidade';
+import { GERAL, rotas, useEventoAtual } from '../lib/evento';
 import FullscreenButton from '../components/FullscreenButton';
 
 // Cronômetro da competição, pensado para ser projetado.
@@ -30,7 +30,7 @@ function formatClock(totalSeconds) {
 export default function AthleteTimer() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const mod = useModalidade();
+  const mod = useEventoAtual();
   const r = rotas(mod.slug);
 
   const [categoryId, setCategoryId] = useState(null);
@@ -46,7 +46,7 @@ export default function AthleteTimer() {
     supabase
       .from('categories')
       .select('id')
-      .eq('name', mod.categoryName)
+      .eq('slug', mod.slug)
       .single()
       .then(({ data }) => {
         if (vivo && data) setCategoryId(data.id);
@@ -54,7 +54,7 @@ export default function AthleteTimer() {
     return () => {
       vivo = false;
     };
-  }, [mod.categoryName]);
+  }, [mod.slug]);
 
   // ---- carrega e escuta o estado da SUA competição ----
   const load = useCallback(async () => {

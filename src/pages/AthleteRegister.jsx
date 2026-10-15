@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useEvent } from '../lib/useEvent';
-import { useModalidade } from '../lib/modalidade';
+import { useEventoAtual } from '../lib/evento';
 import { disciplineOf } from '../lib/disciplines';
 import PhaseTabs from '../components/PhaseTabs';
-import ModalityBar from '../components/ModalityBar';
+import EventBar from '../components/EventBar';
 import StateFlag from '../components/StateFlag';
 import { STATES, isValidUf } from '../lib/states';
 
@@ -14,9 +14,9 @@ import { STATES, isValidUf } from '../lib/states';
 // fases seguintes são preenchidas pela promoção automática.
 
 export default function AthleteRegister() {
-  const mod = useModalidade();
+  const mod = useEventoAtual();
   const { category, rounds, activeRound, entries, athletes, getRound, loading, refresh } =
-    useEvent(mod.categoryName);
+    useEvent(mod.slug);
   const discipline = disciplineOf(category);
 
   // Cada modalidade tem a sua lista de atletas: o mesmo escalador que compete
@@ -124,7 +124,7 @@ export default function AthleteRegister() {
   return (
     <div className="min-h-screen bg-panel px-4 py-8">
       <div className="max-w-3xl mx-auto">
-        <ModalityBar area="controle" atual="cadastro" subtitulo="Cadastro de atletas" />
+        <EventBar area="controle" atual="cadastro" subtitulo="Cadastro de atletas" />
 
         <div className="mb-6">
           <PhaseTabs
