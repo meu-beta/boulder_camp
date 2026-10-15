@@ -2,11 +2,14 @@ import { Navigate, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 import Home from './pages/Home';
-import CompHub from './pages/CompHub';
-import ModalityPicker from './pages/ModalityPicker';
-import ModalidadeGuard from './components/ModalidadeGuard';
+import EventList from './pages/EventList';
+import EventPicker from './pages/EventPicker';
+import EventoGuard from './components/EventoGuard';
 import PublicRanking from './pages/PublicRanking';
 import PublicInsights from './pages/PublicInsights';
+
+import AdminEvents from './pages/AdminEvents';
+import AdminEventForm from './pages/AdminEventForm';
 
 import StaffLogin from './pages/StaffLogin';
 import StaffPanel from './pages/StaffPanel';
@@ -18,34 +21,37 @@ import AthleteQueue from './pages/AthleteQueue';
 import AthleteTimer from './pages/AthleteTimer';
 import RoundsAdmin from './pages/RoundsAdmin';
 
-import { useModalidade } from './lib/modalidade';
+import { useEventoAtual } from './lib/evento';
 
 // ============================================================
-// Duas competições, duas árvores
+// Uma árvore por evento
 // ============================================================
 //
-//   /comp                          hub — o único lugar que vê as duas
-//   /comp/boulder                  ranking (telão)
-//   /comp/boulder/staff            painel de pontuação
-//   /comp/boulder/controle/...     cadastro · fases · fila · cronômetro
-//   /comp/guiada                   ranking (telão)
-//   /comp/guiada/staff             painel de pontuação
-//   /comp/guiada/controle/...      cadastro · fases · cronômetro
+// Antes havia duas árvores fixas, /comp/boulder e /comp/guiada, porque só
+// existia uma competição de cada tipo. Agora o endereço carrega o EVENTO, e a
+// modalidade é propriedade dele:
 //
-// Dentro de uma árvore não existe link para a outra. Trocar de competição
-// passa obrigatoriamente pela tela de escolha, que é um gesto deliberado —
-// e não um clique distraído no meio da arbitragem.
+//   /comp                       a lista do que está acontecendo
+//   /comp/e/:evento             um evento — ranking, arbitragem, controle
+//   /comp/admin                 criar, editar, publicar, arquivar
+//
+// O EventoGuard, no topo da árvore de evento, traduz o slug no registro e o
+// entrega por contexto. Nenhuma tela lá dentro precisa saber de onde ele veio.
 
 /** O painel do árbitro é a única tela cujo miolo muda com a modalidade. */
 function PainelDoArbitro() {
-  const mod = useModalidade();
-  return mod.slug === 'guiada' ? <StaffPanelLead /> : <StaffPanel />;
+  const ev = useEventoAtual();
+  return ev.modality === 'guiada' ? <StaffPanelLead /> : <StaffPanel />;
 }
 
-/** A fila é o rodízio entre blocos; na Guiada não existe. */
-function FilaDaModalidade() {
-  const mod = useModalidade();
-  if (!mod.temFila) return <Navigate to={`/comp/${mod.slug}/controle/fases`} replace />;
+/**
+ * A fila é a rotação entre blocos — faz sentido no boulder, não na guiada,
+ * onde a ordem de largada é outra coisa. Em vez de esconder o link e deixar o
+ * endereço quebrado, mandamos para as fases.
+ */
+function FilaDoEvento() {
+  const ev = useEventoAtual();
+  if (!ev.temFila) return <Navigate to="../fases" replace />;
   return <AthleteQueue />;
 }
 
@@ -61,19 +67,27 @@ const controle = (element) => (
   </ProtectedRoute>
 );
 
+const admin = (element) => (
+  <ProtectedRoute role="admin" redirectTo="/comp/admin/login">
+    {element}
+  </ProtectedRoute>
+);
+
 export default function App() {
   return (
     <Routes>
-      {/* HOME — convite para conhecer o app Meu Beta */}
       <Route path="/" element={<Home />} />
 
-      {/* ---------- Geral, fora das modalidades ---------- */}
-      <Route path="/comp" element={<CompHub />} />
-      <Route path="/comp/insights" element={<PublicInsights />} />
-      <Route path="/comp/escolher/:area" element={<ModalityPicker />} />
+      {/* ---------- Geral ---------- */}
+      <Route path="/comp" element={<EventList />} />
+      <Route path="/comp/anteriores" element={<EventList anteriores />} />
+      {/* Insights passou a ser de um evento: fora dele não há o que resumir. */}
+      <Route path="/comp/insights" element={<Navigate to="/comp" replace />} />
+      <Route path="/comp/escolher/:area" element={<EventPicker />} />
 
-      {/* Um login por área, servindo as duas competições. A escolha da
-          modalidade vem logo depois, na tela de escolha. */}
+      {/* ---------- Portas de entrada ----------
+          O login só diz QUEM você é. Em qual evento você vai trabalhar vem
+          logo depois, na tela de escolha. */}
       <Route
         path="/comp/staff/login"
         element={<StaffLogin role="staff" redirectTo="/comp/escolher/staff" />}
@@ -88,10 +102,22 @@ export default function App() {
           />
         }
       />
+      <Route
+        path="/comp/admin/login"
+        element={<StaffLogin role="admin" title="ADMINISTRAÇÃO" redirectTo="/comp/admin" />}
+      />
 
-      {/* ---------- Árvore de cada modalidade ---------- */}
-      <Route path="/comp/:modalidade" element={<ModalidadeGuard />}>
+      {/* ---------- Administração ----------
+          'novo' antes de ':evento' não é obrigatório no React Router (rota
+          estática ganha da dinâmica), mas deixa a intenção visível. */}
+      <Route path="/comp/admin" element={admin(<AdminEvents />)} />
+      <Route path="/comp/admin/novo" element={admin(<AdminEventForm />)} />
+      <Route path="/comp/admin/:evento" element={admin(<AdminEventForm />)} />
+
+      {/* ---------- Árvore de um evento ---------- */}
+      <Route path="/comp/e/:evento" element={<EventoGuard />}>
         <Route index element={<PublicRanking />} />
+        <Route path="insights" element={<PublicInsights />} />
 
         <Route path="staff" element={staff(<PainelDoArbitro />)} />
         <Route path="staff/ranking" element={staff(<StaffRanking />)} />
@@ -99,49 +125,34 @@ export default function App() {
         <Route path="controle" element={<Navigate to="fases" replace />} />
         <Route path="controle/cadastro" element={controle(<AthleteRegister />)} />
         <Route path="controle/fases" element={controle(<RoundsAdmin />)} />
-        <Route path="controle/fila" element={controle(<FilaDaModalidade />)} />
+        <Route path="controle/fila" element={controle(<FilaDoEvento />)} />
         <Route path="controle/cronometro" element={controle(<AthleteTimer />)} />
       </Route>
 
       {/* ---------- Endereços antigos ----------
-          O telão pode estar apontado para um deles e árbitros têm links
-          salvos no celular. Nada pode quebrar no meio de um evento, então
-          todos continuam funcionando como redirecionamento. */}
-      <Route path="/comp/lead" element={<Navigate to="/comp/guiada" replace />} />
-      <Route path="/comp/staff/panel" element={<Navigate to="/comp/boulder/staff" replace />} />
-      <Route path="/comp/staff/lead" element={<Navigate to="/comp/guiada/staff" replace />} />
-      <Route
-        path="/comp/staff/ranking"
-        element={<Navigate to="/comp/boulder/staff/ranking" replace />}
-      />
+          Antes da ideia de evento, a modalidade estava no endereço e havia uma
+          competição só de cada tipo. Não há como adivinhar para QUAL evento um
+          link desses apontava, então levamos para a lista — ou para a porta de
+          entrada certa, quando o endereço já dizia de qual área se tratava.
+
+          IMPORTANTE: o link do telão mudou. Quem projeta o ranking precisa
+          apontar para /comp/e/<evento>. */}
+      <Route path="/comp/boulder/*" element={<Navigate to="/comp" replace />} />
+      <Route path="/comp/guiada/*" element={<Navigate to="/comp" replace />} />
+      <Route path="/comp/lead" element={<Navigate to="/comp" replace />} />
+      <Route path="/comp/staff/panel" element={<Navigate to="/comp/escolher/staff" replace />} />
+      <Route path="/comp/staff/lead" element={<Navigate to="/comp/escolher/staff" replace />} />
+      <Route path="/comp/staff/ranking" element={<Navigate to="/comp/escolher/staff" replace />} />
       <Route
         path="/comp/athlete-control/login"
         element={<Navigate to="/comp/controle/login" replace />}
       />
       <Route
-        path="/comp/athlete-control/register"
-        element={<Navigate to="/comp/boulder/controle/cadastro" replace />}
+        path="/comp/athlete-control/*"
+        element={<Navigate to="/comp/escolher/controle" replace />}
       />
-      <Route
-        path="/comp/athlete-control/register/lead"
-        element={<Navigate to="/comp/guiada/controle/cadastro" replace />}
-      />
-      <Route
-        path="/comp/athlete-control/rounds"
-        element={<Navigate to="/comp/boulder/controle/fases" replace />}
-      />
-      <Route
-        path="/comp/athlete-control/rounds/lead"
-        element={<Navigate to="/comp/guiada/controle/fases" replace />}
-      />
-      <Route
-        path="/comp/athlete-control/queue"
-        element={<Navigate to="/comp/boulder/controle/fila" replace />}
-      />
-      <Route
-        path="/comp/athlete-control/timer"
-        element={<Navigate to="/comp/boulder/controle/cronometro" replace />}
-      />
+
+      <Route path="*" element={<Navigate to="/comp" replace />} />
     </Routes>
   );
 }
