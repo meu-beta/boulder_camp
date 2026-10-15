@@ -88,8 +88,8 @@ const LEAD = {
 export const DISCIPLINES = { boulder: BOULDER, lead: LEAD };
 
 /** A modalidade de uma categoria. Sem categoria, assume boulder. */
-export function disciplineOf(category) {
-  return DISCIPLINES[category?.discipline] ?? BOULDER;
+export function disciplineOf(evento) {
+  return evento?.modality === 'guiada' ? LEAD : BOULDER;
 }
 
 /** Nome da categoria a partir da chave da modalidade, para o useEvent. */

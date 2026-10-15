@@ -2,13 +2,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { disciplineOf } from './disciplines';
 
-// Carrega o evento inteiro de uma vez (são poucas dezenas de linhas) e
-// mantém tudo sincronizado via Supabase Realtime. Calcular o ranking no
-// cliente deixa o desempate por "fase anterior" trivial, porque todas as
-// fases já estão em memória.
+// Carrega um EVENTO inteiro de uma vez (são poucas dezenas de linhas) e mantém
+// tudo sincronizado via Supabase Realtime. Calcular o ranking no cliente deixa
+// o desempate por "fase anterior" trivial, porque todas as fases já estão em
+// memória.
+//
+// ------------------------------------------------------------------
+// Por que a tabela se chama `categories` e o código fala "evento"
+// ------------------------------------------------------------------
+// Essa tabela sempre guardou a competição, nunca uma categoria: tinha duas
+// linhas, "Boulder" e "Lead". Com o modelo de eventos (cada categoria é um
+// evento próprio), ela virou o que sempre foi. Renomear a tabela exigiria
+// derrubar o sistema no mesmo minuto do deploy, e não compensa o risco por um
+// ganho só de nome. Fica para uma janela tranquila; está escrito em
+// supabase/migrations/2026-10-16-eventos-B-renomeacao.sql.
+//
+// Regra para quem mexer aqui: `categories` e `category_id` aparecem APENAS nas
+// consultas. Em todo o resto do código, a coisa se chama evento.
 
 const EMPTY = {
   category: null,
+  evento: null,
   rounds: [],
   boulders: [],
   athletes: [],
@@ -17,26 +31,32 @@ const EMPTY = {
   queue: [],
 };
 
-export function useEvent(categoryName = 'Boulder') {
+export function useEvent(slug) {
   const [data, setData] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data: category } = await supabase
+    if (!slug) {
+      setData(EMPTY);
+      setLoading(false);
+      return;
+    }
+
+    const { data: evento } = await supabase
       .from('categories')
       .select('*')
-      .eq('name', categoryName)
-      .single();
+      .eq('slug', slug)
+      .maybeSingle();
 
-    if (!category) {
+    if (!evento) {
       setData(EMPTY);
       setLoading(false);
       return;
     }
 
     const [rounds, athletes] = await Promise.all([
-      supabase.from('rounds').select('*').eq('category_id', category.id).order('sequence'),
-      supabase.from('athletes').select('*').eq('category_id', category.id).order('bib_number'),
+      supabase.from('rounds').select('*').eq('category_id', evento.id).order('sequence'),
+      supabase.from('athletes').select('*').eq('category_id', evento.id).order('bib_number'),
     ]);
 
     const roundIds = (rounds.data ?? []).map((r) => r.id);
@@ -59,7 +79,11 @@ export function useEvent(categoryName = 'Boulder') {
       : { data: [] };
 
     setData({
-      category,
+      // `category` continua exportado com esse nome para não quebrar as telas
+      // que já o consomem. `evento` é o nome certo e o que deve ser usado daqui
+      // para a frente.
+      category: evento,
+      evento,
       rounds: rounds.data ?? [],
       boulders: boulders.data ?? [],
       athletes: athletes.data ?? [],
@@ -68,7 +92,7 @@ export function useEvent(categoryName = 'Boulder') {
       queue: queue.data ?? [],
     });
     setLoading(false);
-  }, [categoryName]);
+  }, [slug]);
 
   useEffect(() => {
     load();
@@ -87,7 +111,7 @@ export function useEvent(categoryName = 'Boulder') {
       }, 400);
     };
 
-    const channel = supabase.channel('meu-beta-comp');
+    const channel = supabase.channel(`meu-beta-comp-${slug ?? 'nenhum'}`);
     ['scores', 'queue_entries', 'athletes', 'round_entries', 'rounds', 'boulders'].forEach(
       (table) => {
         channel.on('postgres_changes', { event: '*', schema: 'public', table }, agendar);
@@ -99,14 +123,14 @@ export function useEvent(categoryName = 'Boulder') {
       if (pendente) clearTimeout(pendente);
       supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, slug]);
 
   // Ranking de todas as fases, em ordem, encadeando o desempate.
-  // Qual cálculo roda depende da modalidade da categoria — ver disciplines.js.
+  // Qual cálculo roda depende da modalidade do evento — ver disciplines.js.
   const rankingByRound = useMemo(() => {
     const result = new Map();
     const athleteById = new Map(data.athletes.map((a) => [a.id, a]));
-    const discipline = disciplineOf(data.category);
+    const discipline = disciplineOf(data.evento);
 
     const ordenadas = [...data.rounds].sort((a, b) => a.sequence - b.sequence);
     const ultima = ordenadas.length ? ordenadas[ordenadas.length - 1].id : null;
