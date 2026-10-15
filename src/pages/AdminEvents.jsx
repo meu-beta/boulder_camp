@@ -220,6 +220,12 @@ export default function AdminEvents() {
                     >
                       Abrir
                     </Link>
+                    <Link
+                      to={rotas(e.slug).relatorio}
+                      className="px-3 py-1.5 rounded bg-white/10 hover:bg-white/20"
+                    >
+                      Relatório
+                    </Link>
                     <button
                       type="button"
                       disabled={trabalhando}

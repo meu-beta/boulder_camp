@@ -26,28 +26,41 @@ function Cartao({ evento }) {
   const visual = visualDaModalidade(evento.modality);
   const estado = estadoDoEvento(evento);
   const periodo = periodoEmTexto(evento.starts_on, evento.ends_on);
+  const r = rotas(evento.slug);
+  // Enquanto o evento corre, o que interessa é o ranking ao vivo. Depois que
+  // acaba, o que as pessoas procuram é o resultado consolidado.
+  const encerrado = estado.chave === 'encerrado' || estado.chave === 'arquivado';
 
   return (
-    <Link
-      to={rotas(evento.slug).ranking}
-      className="block bg-panel2 border border-white/10 rounded-xl overflow-hidden hover:border-white/30 transition"
-    >
-      <div className={`${visual.corFaixa} ${visual.corTexto} px-4 py-1.5 text-xs font-bold`}>
-        {visual.label}
-      </div>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <p className="font-semibold text-white leading-tight">{evento.name}</p>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${estado.cor}`}>
-            {estado.label}
-          </span>
+    <div className="bg-panel2 border border-white/10 rounded-xl overflow-hidden hover:border-white/30 transition">
+      <Link to={r.ranking} className="block">
+        <div className={`${visual.corFaixa} ${visual.corTexto} px-4 py-1.5 text-xs font-bold`}>
+          {visual.label}
         </div>
-        {periodo ? <p className="text-white/40 text-xs mt-2">{periodo}</p> : null}
-        {evento.federation ? (
-          <p className="text-white/30 text-xs mt-1 truncate">{evento.federation}</p>
-        ) : null}
+        <div className="p-4 pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-semibold text-white leading-tight">{evento.name}</p>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${estado.cor}`}>
+              {estado.label}
+            </span>
+          </div>
+          {periodo ? <p className="text-white/40 text-xs mt-2">{periodo}</p> : null}
+          {evento.federation ? (
+            <p className="text-white/30 text-xs mt-1 truncate">{evento.federation}</p>
+          ) : null}
+        </div>
+      </Link>
+      <div className="px-4 pb-3">
+        <Link
+          to={r.relatorio}
+          className={`text-xs underline underline-offset-2 ${
+            encerrado ? 'text-gold hover:text-white' : 'text-white/30 hover:text-white'
+          }`}
+        >
+          {encerrado ? 'Ver relatório final' : 'Relatório'}
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }
 
